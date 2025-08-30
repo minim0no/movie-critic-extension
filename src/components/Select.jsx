@@ -5,9 +5,9 @@ import { Check, ChevronDown } from "lucide-react";
 function Select({ items, placeholder, value, setValue }) {
     return (
         <RadixSelect.Root value={value} onValueChange={setValue}>
-            <RadixSelect.Trigger className="inline-flex justify-center items-center gap-2 rounded-md text-left text-sm focus:outline-none">
+            <RadixSelect.Trigger className="inline-flex justify-center items-center gap-2 rounded-md text-left text-sm focus:outline-none whitespace-nowrap">
                 <RadixSelect.Value placeholder={placeholder} />
-                <ChevronDown className="w-4 h-4 text-gray-500" />
+                <ChevronDown className="min-w-4 min-h-4 max-w-4 max-h-4 text-gray-500" />
             </RadixSelect.Trigger>
             <RadixSelect.Portal>
                 <RadixSelect.Content
