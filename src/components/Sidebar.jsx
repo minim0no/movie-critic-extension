@@ -325,18 +325,18 @@ export default function Sidebar({
                     </div>
                 </Dialog>
 
-                <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <main className="mx-auto max-w-7xl">
                     <div className="flex items-baseline justify-between">
                         <div className="flex items-center">
                             <Menu
                                 as="div"
                                 className="relative inline-block text-left"
                             >
-                                <MenuButton className="group inline-flex justify-center text-sm font-medium text-gray-700 hover:text-gray-900 cursor-pointer">
+                                <MenuButton className="group inline-flex justify-center text-sm border border-gray-200 px-2 py-1 rounded-md font-medium text-gray-700 hover:text-gray-900 cursor-pointer">
                                     Sort
                                     <ChevronDown
                                         aria-hidden="true"
-                                        className="-mr-1 ml-1 size-5 shrink-0 text-gray-400 group-hover:text-gray-500"
+                                        className="-mr-1 ml-1 size-5 shrink-0"
                                     />
                                 </MenuButton>
 
@@ -367,13 +367,10 @@ export default function Sidebar({
                             <button
                                 type="button"
                                 onClick={() => setMobileFiltersOpen(true)}
-                                className="-m-2 ml-4 p-2 text-gray-400 hover:text-gray-500 sm:ml-6 lg:hidden"
+                                className=" ml-2 p-2 border border-gray-200 px-2 py-1 rounded-md text-gray-700 hover:text-gray-900 cursor-pointer"
                             >
                                 <span className="sr-only">Filters</span>
-                                <Funnel
-                                    aria-hidden="true"
-                                    className="size-5 cursor-pointer"
-                                />
+                                <Funnel aria-hidden="true" className="size-5" />
                             </button>
                         </div>
                     </div>
