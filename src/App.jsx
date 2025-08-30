@@ -1,56 +1,57 @@
 import { useState } from "react";
-import { Film, Search, Heart, Sparkles } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "./components/tabs";
+import { Search, Heart, Sparkles } from "lucide-react";
+import NavButton from "./components/NavButton";
+import SearchMovies from "./components/SearchMovies";
 
 export default function App() {
-    const [watchlist, setWatchlist] = useState([
-        {
-            id: 2,
-            title: "Inception",
-            year: 2010,
-            genre: "Sci-Fi",
-            rating: 8.8,
-            poster: "https://images.unsplash.com/photo-1524712245354-2c4e5e7121c0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaW5lbWElMjBtb3ZpZSUyMHRoZWF0ZXJ8ZW58MXx8fHwxNzU2NTAyMjY2fDA&ixlib=rb-4.1.0&q=80&w=1080",
-        },
-        {
-            id: 5,
-            title: "Pulp Fiction",
-            year: 1994,
-            genre: "Crime",
-            rating: 8.9,
-            poster: "https://images.unsplash.com/photo-1608170825938-a8ea0305d46c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3ZpZSUyMHBvcGNvcm4lMjBjaW5lbWF8ZW58MXx8fHwxNzU2NTAyMjcxfDA&ixlib=rb-4.1.0&q=80&w=1080",
-        },
-    ]);
-
-    const handleAddToWatchlist = (movie) => {
-        if (!watchlist.some((w) => w.id === movie.id)) {
-            setWatchlist([...watchlist, movie]);
-        }
-    };
-
-    const handleRemoveFromWatchlist = (movie) => {
-        setWatchlist(watchlist.filter((w) => w.id !== movie.id));
-    };
+    const [view, setView] = useState("search");
 
     return (
-        <div className="w-[380px] h-[600px] bg-background border rounded-lg overflow-hidden flex flex-col">
+        <div className="w-[380px] h-[600px] bg-white border border-stone-800 rounded-lg overflow-hidden flex flex-col">
             {/* Header */}
-            <div className="bg-[#171717] text-white p-4 border-b">
+            <div className="bg-stone-800 text-white p-4 border-b">
                 <div className="flex items-center gap-3">
                     <div className="bg-white/10 p-2 rounded-lg">
-                        <Film className="w-5 h-5" />
+                        <img src="./icons/128x128.png" className="w-12 h-12" />
                     </div>
                     <div>
-                        <h1 className="font-medium">CineMate</h1>
+                        <h1 className="font-medium">
+                            <span className="text-red-500">Cine</span>Mate
+                        </h1>
                         <p className="text-xs opacity-70">
                             Track, Analyze, and Discover Movies
                         </p>
                     </div>
                 </div>
             </div>
+            {/* Navigation */}
+            <div className="w-full flex items-center justify-around border-b border-slate-200 py-2 px-6">
+                <NavButton
+                    icon={<Search className="w-4 h-4" />}
+                    label="Search"
+                    focus={view === "search"}
+                    onClick={() => setView("search")}
+                />
+                <NavButton
+                    icon={<Heart className="w-4 h-4" />}
+                    label="My List"
+                    focus={view === "myList"}
+                    onClick={() => setView("myList")}
+                />
+                <NavButton
+                    icon={<Sparkles className="w-4 h-4" />}
+                    label="Recommended"
+                    focus={view === "recommended"}
+                    onClick={() => setView("recommended")}
+                />
+            </div>
 
             {/* Main Content */}
-            <div className="flex-1 overflow-hidden"></div>
+            <div>
+                {view === "search" && <SearchMovies />}
+                {view === "myList" && <div />}
+                {view === "recommended" && <div />}
+            </div>
         </div>
     );
 }
