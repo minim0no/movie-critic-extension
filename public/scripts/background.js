@@ -2,6 +2,34 @@ const API_KEY = "";
 
 let movie = {};
 
+function clearExpiredCachedMovies() {
+    chrome.storage.local.get(null, (items) => {
+        const keys = Object.keys(items);
+
+        const movieKeys = keys.filter(
+            (key) => key.startsWith("movie-") || key.includes("_")
+        );
+
+        if (movieKeys.length > 0) {
+            try {
+                movieKeys.forEach((key) => {
+                    const cached = JSON.parse(items[key]);
+                    const oneDay = 24 * 60 * 60 * 1000;
+                    if (
+                        cached.timestamp &&
+                        Date.now() - cached.timestamp > oneDay
+                    ) {
+                        chrome.storage.local.remove(key);
+                    }
+                });
+            } catch (e) {
+                // Skip malformed entries
+                console.warn(`Failed to parse cached movie}`, e);
+            }
+        }
+    });
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     movie.name = message.movieName;
     if (message.movieYear != null) {
@@ -17,7 +45,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const data = await response.json();
         return data;
     }
-    const cacheKey = `${movie.name.toLowerCase()}_${
+    const cacheKey = `movie-${movie.name.toLowerCase()}_${
         movie.year?.substring(0, 4) || "any"
     }`;
 
@@ -34,20 +62,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 sendResponse({ movieData: cachedData.data });
                 return;
             } else {
-                chrome.storage.local.remove(cacheKey);
+                clearExpiredCachedMovies();
             }
         }
 
         getMovieData()
             .then((data) => {
                 console.log("API response received:", data);
-                if (data.Response === "True") {
-                    chrome.storage.local.set({
-                        [cacheKey]: JSON.stringify({
-                            data,
-                            timestamp: Date.now(),
-                        }),
-                    });
+                try {
+                    if (data.Response === "True") {
+                        chrome.storage.local.set({
+                            [cacheKey]: JSON.stringify({
+                                data,
+                                timestamp: Date.now(),
+                            }),
+                        });
+                    }
+                } catch (e) {
+                    console.error("Error caching movie data:", e);
                 }
 
                 sendResponse({ movieData: data });

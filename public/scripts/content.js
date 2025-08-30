@@ -198,7 +198,7 @@ function positionPopup(previewModal) {
     if (imageRect.left <= bodyRect.width / 2) {
         infoLeft += imageRect.width;
     } else {
-        infoLeft -= imageRect.width;
+        infoLeft -= imageRect.width + 50;
     }
 
     if (infoLeft <= 0) {
