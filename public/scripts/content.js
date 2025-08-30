@@ -1,73 +1,3 @@
-const movieData = {
-    shawshank: {
-        name: "The Shawshank Redemption",
-        imdbRating: 9.3,
-        voterCount: 2800000,
-        rottenTomatoesScore: 91,
-        actors: [
-            "Tim Robbins",
-            "Morgan Freeman",
-            "Bob Gunton",
-            "William Sadler",
-            "Clancy Brown",
-        ],
-        awards: [
-            "Academy Award Nominee - Best Picture",
-            "Golden Globe Nominee - Best Motion Picture",
-        ],
-        runtime: "2h 22m",
-        genre: ["Drama", "Crime"],
-        aiCritique:
-            "A masterful exploration of hope and friendship within the confines of prison walls. The film's emotional depth and Freeman's iconic narration create an unforgettable cinematic experience that transcends its genre.",
-        posterUrl:
-            "https://images.unsplash.com/photo-1753944847480-92f369a5f00e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080",
-    },
-    inception: {
-        name: "Inception",
-        imdbRating: 8.8,
-        voterCount: 2400000,
-        rottenTomatoesScore: 87,
-        actors: [
-            "Leonardo DiCaprio",
-            "Marion Cotillard",
-            "Tom Hardy",
-            "Ellen Page",
-        ],
-        awards: [
-            "Academy Award Winner - Best Cinematography",
-            "BAFTA Winner - Best Visual Effects",
-        ],
-        runtime: "2h 28m",
-        genre: ["Sci-Fi", "Thriller"],
-        aiCritique:
-            "Nolan's intricate dreamscape thriller challenges viewers with layered storytelling and stunning visuals. A mind-bending journey that rewards multiple viewings and deep contemplation.",
-        posterUrl:
-            "https://images.unsplash.com/photo-1562618900-07538435c375?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080",
-    },
-    pulp: {
-        name: "Pulp Fiction",
-        imdbRating: 8.9,
-        voterCount: 2100000,
-        rottenTomatoesScore: 92,
-        actors: [
-            "John Travolta",
-            "Samuel L. Jackson",
-            "Uma Thurman",
-            "Bruce Willis",
-        ],
-        awards: [
-            "Academy Award Winner - Best Original Screenplay",
-            "Palme d'Or Winner",
-        ],
-        runtime: "2h 34m",
-        genre: ["Crime", "Drama"],
-        aiCritique:
-            "Tarantino's non-linear masterpiece revolutionized cinema with its sharp dialogue and interconnected storylines. A cultural phenomenon that redefined independent filmmaking.",
-        posterUrl:
-            "https://images.unsplash.com/photo-1701294458496-59a3fd98c2ba?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080",
-    },
-};
-
 const popup = document.createElement("div");
 popup.style.position = "fixed";
 popup.style.background = "rgba(0,0,0,0.95)";
@@ -78,8 +8,10 @@ popup.style.boxShadow = "0 25px 50px -12px rgba(0,0,0,0.8)";
 popup.style.zIndex = "10000";
 popup.style.pointerEvents = "none";
 popup.style.opacity = "0";
-popup.style.transform = "scale(0.9)";
 popup.style.transition = "opacity 0.2s ease, transform 0.2s ease";
+popup.style.transform = "scale(0.9)";
+popup.style.fontSize = "16px";
+
 document.body.appendChild(popup);
 
 const starSVG = `
@@ -93,6 +25,23 @@ const starSVG = `
 const usersSVG = `
 <div style="width:1.5rem; height:1.5rem; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.75rem;">
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-users-icon lucide-users"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg>
+</div>
+`;
+
+const spotlightSVG = `
+<div style="width:1.5rem; height:1.5rem; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.75rem;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-spotlight-icon">
+    <!-- Spotlight beams/lights -->
+    <path d="M15.295 19.562 16 22" stroke="#FBBF24"/>
+    <path d="m17 16 3.758 2.098" stroke="#FBBF24"/>
+    <path d="m19 12.5 3.026-.598" stroke="#FBBF24"/>
+    
+    <!-- Spotlight body -->
+    <path d="M7.61 6.3a3 3 0 0 0-3.92 1.3l-1.38 2.79a3 3 0 0 0 1.3 3.91l6.89 3.597a1 1 0 0 0 1.342-.447l3.106-6.211a1 1 0 0 0-.447-1.341z" fill="#010057" stroke="#010057"/>
+    
+    <!-- Handle -->
+    <path d="M8 9V2" stroke="#010057"/>
+    </svg>
 </div>
 `;
 
@@ -128,18 +77,24 @@ function populatePopup(movie) {
     popup.innerHTML = `
       <div style="padding:1rem; border-bottom:1px solid rgba(255,255,255,0.1); display:flex; gap:0.75rem;">
         <img src="${
-            movie.posterUrl
+            movie.Poster
         }" style="width:4rem; height:6rem; object-fit:cover; border-radius:0.375rem; flex-shrink:0;">
         <div style="flex:1; min-width:0;">
           <h4 style="font-weight:600; line-height:1.2; margin:0; margin-bottom:0.5rem; font-size:1.3rem;">${
-              movie.name
+              movie.Title
           }</h4>
           <div style="display:inline-block; background:rgba(255,255,255,0.1); padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:1.1rem; margin-bottom:0.5rem;">${
-              movie.runtime
+              movie.totalSeasons ? movie.totalSeasons + " Season(s)" : ""
           }</div>
+          <div style="display:inline-block; background:rgba(255,255,255,0.1); padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:1.1rem; margin-bottom:0.5rem;">${
+              movie.Runtime
+          }</div>
+          <div style="display:inline-block; background:rgba(255,255,255,0.1); padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:1.1rem; margin-bottom:0.5rem;">${
+              movie.Year
+          }
+          </div>
           <div style="display:flex; flex-wrap:wrap; gap:0.25rem;">
-            ${movie.genre
-                .slice(0, 2)
+            ${movie.Genre.slice(0, 2)
                 .map(
                     (g) =>
                         `<span style="background:transparent; border:1px solid rgba(255,255,255,0.2); padding:0.125rem 0.375rem; border-radius:0.25rem; font-size:1.1rem; color:#d1d5db;">${g}</span>`
@@ -153,35 +108,43 @@ function populatePopup(movie) {
           <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.75rem;">
             <div style="display:flex; align-items:center; gap:0.375rem;">
             ${starSVG}
-              <span style="font-weight:600;">${movie.imdbRating}/10</span>
-              <span style="color:#9ca3af; font-size:1.1rem;">IMDB</span>
+              <span style="font-weight:600;">${movie.imdbRating}</span>
+              <span style="color:#9ca3af; font-size:1.1rem;">IMDb</span>
             </div>
             <div style="display:flex; align-items:center; gap:0.375rem; color:#9ca3af; font-size:1.1rem;">
             ${usersSVG}
-              ${movie.voterCount.toLocaleString()} votes
+              ${movie.imdbVotes.toLocaleString()} votes
             </div>
           </div>
+        ${
+            movie.rottenTomatoesScore
+                ? `
           <div style="display:flex; align-items:center; gap:0.5rem;">
             <div style="width:1.5rem; height:1.5rem; background:#dc2626; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.1rem;">🍅</div>
-            <span style="font-weight:600;">${movie.rottenTomatoesScore}%</span>
+            <span style="font-weight:600;">${movie.rottenTomatoesScore}</span>
             <span style="color:#9ca3af; font-size:1.1rem;">Rotten Tomatoes</span>
           </div>
+            `
+                : ""
+        }
         </div>
         <div style="height:1px; background:rgba(255,255,255,0.1); margin:1rem 0;"></div>
         <div style="margin-bottom:1rem;">
-          <h4 style="font-size:1.3rem; font-weight:600; margin: 0; margin-bottom:0.5rem;">Cast</h4>
-          <div style="display:flex; flex-wrap:wrap; gap:0.25rem;">
-            ${movie.actors
-                .slice(0, 3)
+        <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+            ${spotlightSVG}
+            <h4 style="font-size:1.3rem; font-weight:600; margin: 0;">Cast</h4>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:0.25rem;">
+            ${movie.Actors.slice(0, 3)
                 .map(
                     (a) =>
                         `<span style="background:rgba(255,255,255,0.1); padding:0.125rem 0.375rem; border-radius:0.25rem; font-size:1.1rem;">${a}</span>`
                 )
                 .join("")}
             ${
-                movie.actors.length > 3
+                movie.Actors.length > 3
                     ? `<span style="background:rgba(255,255,255,0.1); padding:0.125rem 0.375rem; border-radius:0.25rem; font-size:1.1rem;">+${
-                          movie.actors.length - 3
+                          movie.Actors.length - 3
                       } more</span>`
                     : ""
             }
@@ -189,29 +152,37 @@ function populatePopup(movie) {
         </div>
         <div style="height:1px; background:rgba(255,255,255,0.1); margin:1rem 0;"></div>
         ${
-            movie.awards && movie.awards.length
+            movie.Awards
+                ? `
+        ${
+            movie.Awards && movie.Awards.length
                 ? `<div style="margin-bottom:1rem;">
                 <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
                     ${trophySVG}
                     <h4 style="font-size:1.3rem; font-weight:600; margin:0;"> Awards</h4>
                 </div>
           <div style="color:#9ca3af; font-size:1.1rem; line-height:1.4;">
-            ${movie.awards
-                .slice(0, 2)
+            ${movie.Awards.slice(0, 2)
                 .map((a) => `<div style="margin-bottom:0.25rem;">${a}</div>`)
                 .join("")}
           </div>
         </div><div style="height:1px; background:rgba(255,255,255,0.1); margin:1rem 0;"></div>`
                 : ""
+        }`
+                : ""
         }
         <div>
+        ${
+            movie.aiCritique
+                ? `
         <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
             ${sparklesSVG}
             <h4 style="font-size:1.3rem; font-weight:600; margin: 0;">AI Critique</h4>
         </div>
-          <p style="color:#9ca3af; font-size:1.1rem; line-height:1.5; margin-top: 0;">${
-              movie.aiCritique
-          }</p>
+          <p style="color:#9ca3af; font-size:1.1rem; line-height:1.5; margin-top: 0;">${movie.aiCritique}</p>
+          `
+                : ""
+        }
         </div>
       </div>
     `;
@@ -244,6 +215,23 @@ function positionPopup(previewModal) {
     popup.style.minHeight = imageRect.height + "px";
 }
 
+function cleanData(data) {
+    data.Title = data.Title || "";
+    data.Runtime = data.Runtime || "";
+    data.totalSeasons = data.totalSeasons || null;
+    data.Year = data.Year || "";
+    data.Genre = data.Genre.split(", ") || [];
+    data.Actors = data.Actors.split(", ") || [];
+    data.Awards = data.Awards.split(". ") || [];
+    data.Poster = data.Poster || "https://placehold.co/200x200.png?text=?";
+    data.imdbRating = data.imdbRating || "N/A";
+    data.rottenTomatoesScore =
+        data.Ratings.find((r) => r.Source === "Rotten Tomatoes")?.Value || "";
+    data.imdbVotes = data.imdbVotes || "N/A";
+    data.aiCritique = data.aiCritique || "No critique available.";
+    return data;
+}
+
 function detectHover() {
     let movieIMGs = document.querySelectorAll(".boxart-image");
     let hoverTimer;
@@ -268,7 +256,10 @@ function detectHover() {
                 }, 500);
 
                 hoverTimer = setTimeout(() => {
-                    let movieTitle = movieIMG.nextElementSibling.textContent;
+                    let movieTitle = movieIMG.nextElementSibling?.innerText;
+                    if (!movieTitle) return;
+                    movieTitle = movieTitle.trim().toLowerCase();
+                    console.log("Fetching data for:", movieTitle);
                     (async () => {
                         const response = await chrome.runtime.sendMessage({
                             movieName: movieTitle,
@@ -276,16 +267,33 @@ function detectHover() {
                         console.log("Response from background:", response);
 
                         if (previewModal != null) {
-                            populatePopup(movieData["shawshank"]);
-                            positionPopup(previewModal);
-                            popup.style.display = "block";
-                            setTimeout(() => {
-                                popup.style.opacity = "1";
-                                popup.style.transform = "scale(1)";
-                            }, 100);
+                            try {
+                                if (response.movieData.Response === "True") {
+                                    const cleanedData = cleanData(
+                                        response.movieData
+                                    );
+                                    console.log("Cleaned Data:", cleanedData);
+                                    populatePopup(cleanedData);
+                                    positionPopup(previewModal);
+                                    popup.style.display = "block";
+                                    setTimeout(() => {
+                                        popup.style.opacity = "1";
+                                        popup.style.transform = "scale(1)";
+                                    }, 100);
+                                }
+                            } catch (e) {
+                                console.error("Error populating popup:", e);
+                            }
                         }
                     })();
                 }, 1000);
+
+                let interval = setInterval(() => {
+                    if (!document.body.contains(movieIMG)) {
+                        clearInterval(interval);
+                        popup.style.display = "none";
+                    }
+                }, 100);
             };
         }
     } catch (error) {
