@@ -7,7 +7,7 @@ export default function App() {
     const [view, setView] = useState("search");
 
     return (
-        <div className="w-[380px] h-[600px] bg-white border border-stone-800 rounded-lg overflow-hidden flex flex-col">
+        <div className="w-[380px] h-[600px] bg-white border border-stone-800 overflow-hidden flex flex-col">
             {/* Header */}
             <div className="bg-stone-800 text-white p-4 border-b">
                 <div className="flex items-center gap-3">
