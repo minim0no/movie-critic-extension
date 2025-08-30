@@ -1,12 +1,19 @@
 {
     "manifest_version": 3,
-    "name": "MovieCritic: Movie Statistics on Netflix",
+    "name": "CineMate: Movie Statistics on Netflix",
     "description": "View IMDb and Rotten Tomatoes ratings and critiques on Netflix or through the extension search bar!",
     "version": "2.0",
     "action": {
         "default_popup": "index.html"
     },
     "permissions": ["activeTab", "storage"],
+    "content_scripts": [
+        {
+            "js": ["scripts/content.js"],
+            "matches": ["https://www.netflix.com/*"],
+            "type": "module"
+        }
+    ],
     "icons": {
         "16": "icons/16x16.png",
         "32": "icons/32x32.png",
