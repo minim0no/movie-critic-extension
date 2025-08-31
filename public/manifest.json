@@ -9,7 +9,11 @@
     "permissions": ["activeTab", "storage"],
     "content_scripts": [
         {
-            "js": ["scripts/content.js"],
+            "js": ["scripts/popup.js"],
+            "matches": ["https://www.netflix.com/*"]
+        },
+        {
+            "js": ["scripts/outroPopup.js"],
             "matches": ["https://www.netflix.com/*"]
         }
     ],

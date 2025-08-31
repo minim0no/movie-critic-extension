@@ -83,16 +83,30 @@ function populatePopup(movie) {
           <h4 style="font-weight:600; line-height:1.2; margin:0; margin-bottom:0.5rem; font-size:1.3rem;">${
               movie.Title
           }</h4>
+          ${
+              movie.totalSeasons
+                  ? `
           <div style="display:inline-block; background:rgba(255,255,255,0.1); padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:1.1rem; margin-bottom:0.5rem;">${
-              movie.totalSeasons ? movie.totalSeasons + " Season(s)" : ""
+              movie.totalSeasons + " Season(s)"
           }</div>
-          <div style="display:inline-block; background:rgba(255,255,255,0.1); padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:1.1rem; margin-bottom:0.5rem;">${
-              movie.Runtime
-          }</div>
-          <div style="display:inline-block; background:rgba(255,255,255,0.1); padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:1.1rem; margin-bottom:0.5rem;">${
-              movie.Year
+        `
+                  : ""
           }
+            ${
+                movie.Runtime
+                    ? `
+          <div style="display:inline-block; background:rgba(255,255,255,0.1); padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:1.1rem; margin-bottom:0.5rem;">${movie.Runtime}</div>
+        `
+                    : ""
+            }
+          ${
+              movie.Year
+                  ? `
+          <div style="display:inline-block; background:rgba(255,255,255,0.1); padding:0.125rem 0.5rem; border-radius:0.25rem; font-size:1.1rem; margin-bottom:0.5rem;">${movie.Year}
           </div>
+        `
+                  : ""
+          }
           <div style="display:flex; flex-wrap:wrap; gap:0.25rem;">
             ${movie.Genre.slice(0, 2)
                 .map(
@@ -217,9 +231,9 @@ function positionPopup(previewModal) {
 
 function cleanData(data) {
     data.Title = data.Title || "";
-    data.Runtime = data.Runtime || "";
+    data.Runtime = data.Runtime || "N/A";
     data.totalSeasons = data.totalSeasons || null;
-    data.Year = data.Year || "";
+    data.Year = data.Year || "N/A";
     data.Genre = data.Genre.split(", ") || [];
     data.Actors = data.Actors.split(", ") || [];
     data.Awards = data.Awards.split(". ") || [];
@@ -247,7 +261,6 @@ function detectHover() {
                         "previewModal--container mini-modal has-smaller-buttons"
                     )[0];
                     if (previewModal != null) {
-                        console.log("on");
                         previewModal.onmouseleave = () => {
                             clearTimeout(hoverTimer);
                             popup.style.display = "none";
@@ -259,12 +272,11 @@ function detectHover() {
                     let movieTitle = movieIMG.nextElementSibling?.innerText;
                     if (!movieTitle) return;
                     movieTitle = movieTitle.trim().toLowerCase();
-                    console.log("Fetching data for:", movieTitle);
                     (async () => {
                         const response = await chrome.runtime.sendMessage({
                             movieName: movieTitle,
+                            type: "MovieQuery",
                         });
-                        console.log("Response from background:", response);
 
                         if (previewModal != null) {
                             try {
@@ -272,7 +284,6 @@ function detectHover() {
                                     const cleanedData = cleanData(
                                         response.movieData
                                     );
-                                    console.log("Cleaned Data:", cleanedData);
                                     populatePopup(cleanedData);
                                     positionPopup(previewModal);
                                     popup.style.display = "block";
