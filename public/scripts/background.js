@@ -1,4 +1,4 @@
-const API_KEY = "9cf2137a";
+const API_KEY = "";
 
 let movie = {};
 

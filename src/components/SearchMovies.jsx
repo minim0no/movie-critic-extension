@@ -3,6 +3,64 @@ import React from "react";
 import Input from "./Input";
 import { Search } from "lucide-react";
 import Sidebar from "./Sidebar";
+import { MovieCard } from "./MovieCard";
+
+const mockMovie = [
+    {
+        id: 1,
+        title: "The Dark Knight",
+        year: 2008,
+        genre: "Action",
+        rating: 9.0,
+        poster: "https://images.unsplash.com/photo-1745564371387-7707cc41e958?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3ZpZSUyMHBvc3RlciUyMGFjdGlvbnxlbnwxfHx8fDE3NTY0NzMyMDd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+        isInWatchlist: false,
+    },
+    {
+        id: 2,
+        title: "Inception",
+        year: 2010,
+        genre: "Sci-Fi",
+        rating: 8.8,
+        poster: "https://images.unsplash.com/photo-1524712245354-2c4e5e7121c0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaW5lbWElMjBtb3ZpZSUyMHRoZWF0ZXJ8ZW58MXx8fHwxNzU2NTAyMjY2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+        isInWatchlist: true,
+    },
+    {
+        id: 3,
+        title: "Parasite",
+        year: 2019,
+        genre: "Thriller",
+        rating: 8.6,
+        poster: "https://images.unsplash.com/photo-1745564371387-7707cc41e958?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3ZpZSUyMHBvc3RlciUyMGRyYW1hfGVufDF8fHx8MTc1NjQwMDg4MXww&ixlib=rb-4.1.0&q=80&w=1080",
+        isInWatchlist: false,
+    },
+    {
+        id: 4,
+        title: "The Godfather",
+        year: 1972,
+        genre: "Drama",
+        rating: 9.2,
+        poster: "https://images.unsplash.com/photo-1661343320593-127da7a9cc13?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmaWxtJTIwcmVlbCUyMHZpbnRhZ2V8ZW58MXx8fHwxNzU2NTAyMjY4fDA&ixlib=rb-4.1.0&q=80&w=1080",
+        isInWatchlist: false,
+    },
+    {
+        id: 5,
+        title: "Pulp Fiction",
+        year: 1994,
+        genre: "Crime",
+        rating: 8.9,
+        poster: "https://images.unsplash.com/photo-1608170825938-a8ea0305d46c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3ZpZSUyMHBvcGNvcm4lMjBjaW5lbWF8ZW58MXx8fHwxNzU2NTAyMjcxfDA&ixlib=rb-4.1.0&q=80&w=1080",
+        isInWatchlist: true,
+    },
+    {
+        id: 6,
+        title: "The Shining",
+        year: 1980,
+        genre: "Horror",
+        rating: 8.4,
+        poster: "https://images.unsplash.com/photo-1712456298333-5747a9506a5d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxob3Jyb3IlMjBtb3ZpZSUyMHBvc3RlcnxlbnwxfHx8fDE3NTY0OTk3ODJ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+        isInWatchlist: false,
+    },
+];
 
 function SearchMovies() {
     const [searchQuery, setSearchQuery] = useState("");
@@ -80,7 +138,7 @@ function SearchMovies() {
     }, [checkboxFilters, numberFilters]);
 
     return (
-        <div className="space-y-6 h-full p-6 rounded-lg">
+        <div className="space-y-6 p-6 rounded-lg h-[600px] overflow-y-auto">
             {/* Search Bar */}
             <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -97,6 +155,17 @@ function SearchMovies() {
                 setCheckboxFilters={setCheckboxFilters}
                 setNumberFilters={setNumberFilters}
             />
+
+            <div className="grid grid-cols-2 gap-3 mb-36">
+                {mockMovie.map((movie) => (
+                    <MovieCard
+                        key={movie.id}
+                        movie={movie}
+                        onAddToWatchlist={() => {}}
+                        onRemoveFromWatchlist={() => {}}
+                    />
+                ))}
+            </div>
         </div>
     );
 }
