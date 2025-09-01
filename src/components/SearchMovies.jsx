@@ -156,6 +156,15 @@ function SearchMovies() {
                 setNumberFilters={setNumberFilters}
             />
 
+            <div className="flex items-center justify-between mb-3">
+                <span className=" text-base font-medium">
+                    {searchQuery ? "Search Results" : "Trending"}
+                </span>
+                <span className="text-sm text-stone-500">
+                    {mockMovie.length} movies found
+                </span>
+            </div>
+
             <div className="grid grid-cols-2 gap-3 mb-36">
                 {mockMovie.map((movie) => (
                     <MovieCard
