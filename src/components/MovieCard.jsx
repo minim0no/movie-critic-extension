@@ -7,11 +7,23 @@ export function MovieCard({
     onAddToWatchlist,
     onRemoveFromWatchlist,
     showActions = true,
+    onViewDetails,
 }) {
     const [imgError, setImgError] = useState(false);
 
+    const handleCardClick = (e) => {
+        // Don't trigger if clicking on action buttons
+        if (e.target.closest("button")) {
+            return;
+        }
+        onViewDetails && onViewDetails(movie);
+    };
+
     return (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-all duration-200 overflow-hidden group">
+        <div
+            className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-all duration-200 overflow-hidden group cursor-pointer relative"
+            onClick={handleCardClick}
+        >
             <div className="aspect-[2/3] relative overflow-hidden">
                 <img
                     src={imgError ? "/fallback-poster.png" : movie.poster}
@@ -30,7 +42,7 @@ export function MovieCard({
             </div>
 
             <div className="p-3">
-                <h3 className="font-medium line-clamp-2 mb-1.5">
+                <h3 className="font-medium line-clamp-2 mb-1.5 whitespace-nowrap overflow-hidden text-ellipsis">
                     {movie.title}
                 </h3>
                 <div className="flex items-center justify-between text-sm text-gray-500 mb-3">
@@ -45,20 +57,22 @@ export function MovieCard({
                         {movie.isInWatchlist ? (
                             <button
                                 className="flex-1 text-xs h-8 border border-red-500 text-red-500 rounded-md flex items-center justify-center hover:bg-red-500 hover:text-white cursor-pointer"
-                                onClick={() =>
+                                onClick={(e) => {
+                                    e.stopPropagation();
                                     onRemoveFromWatchlist &&
-                                    onRemoveFromWatchlist(movie)
-                                }
+                                        onRemoveFromWatchlist(movie);
+                                }}
                             >
                                 <Check className="w-3 h-3 mr-1" />
                                 In List
                             </button>
                         ) : (
                             <button
-                                className="flex-1 text-xs h-8 bg-red-500 text-white rounded-md flex items-center justify-center hover:bg-white-600 cursor-pointer"
-                                onClick={() =>
-                                    onAddToWatchlist && onAddToWatchlist(movie)
-                                }
+                                className="flex-1 text-xs h-8 bg-red-500 text-white rounded-md flex items-center justify-center hover:bg-white hover:text-red-500 border border-red-500 cursor-pointer"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onAddToWatchlist && onAddToWatchlist(movie);
+                                }}
                             >
                                 <Plus className="w-3 h-3 mr-1" />
                                 Add

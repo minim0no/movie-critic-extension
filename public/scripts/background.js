@@ -31,6 +31,17 @@ function clearExpiredCachedMovies() {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // Handle popup opening requests
+    if (message.action === "openPopup") {
+        // Store the requested view in storage so the popup can read it
+        chrome.storage.local.set({ requestedView: message.view }, () => {
+            // Open the popup
+            chrome.action.openPopup();
+        });
+        return;
+    }
+
+    // Handle movie data requests
     movie.name = message.movieName;
     if (message.movieYear != null) {
         movie.year = message.movieYear;

@@ -116,7 +116,31 @@ function createNetflixRatingModal(movieTitle, onRate, onClose) {
     // CineMate button logic
     const cineBtn = modal.querySelector("#cinemate-btn");
     let addedToList = false;
-    cineBtn.addEventListener("click", () => {
+    cineBtn.addEventListener("click", async () => {
+        // Check if user is authenticated
+        try {
+            const result = await chrome.storage.local.get(["authToken"]);
+            if (!result.authToken) {
+                // User is not authenticated, open the extension popup to MyList page
+                chrome.runtime.sendMessage({
+                    action: "openPopup",
+                    view: "myList",
+                });
+                modal.remove();
+                return;
+            }
+        } catch (error) {
+            console.error("Error checking authentication:", error);
+            // If there's an error, assume not authenticated and redirect
+            chrome.runtime.sendMessage({
+                action: "openPopup",
+                view: "myList",
+            });
+            modal.remove();
+            return;
+        }
+
+        // User is authenticated, proceed with adding/removing from list
         addedToList = !addedToList;
         const icon = cineBtn.querySelector(".btn-icon");
         const text = cineBtn.querySelector(".btn-text");

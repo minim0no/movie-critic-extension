@@ -11,12 +11,14 @@ import {
     MenuItem,
     MenuItems,
 } from "@headlessui/react";
-import { X, ChevronDown, Funnel, Minus, Plus } from "lucide-react";
+import { X, ChevronDown, Funnel, Minus, Plus, RotateCcw } from "lucide-react";
 
 const sortOptions = [
-    { name: "Most Popular", href: "#", current: true },
-    { name: "Best Rating", href: "#", current: false },
-    { name: "Newest", href: "#", current: false },
+    { name: "Best Rating", value: "rating", current: true },
+    { name: "Newest", value: "newest", current: false },
+    { name: "Oldest", value: "oldest", current: false },
+    { name: "A-Z", value: "title-asc", current: false },
+    { name: "Z-A", value: "title-desc", current: false },
 ];
 
 function classNames(...classes) {
@@ -28,6 +30,8 @@ export default function Sidebar({
     numberFilters,
     setCheckboxFilters,
     setNumberFilters,
+    sortOption,
+    setSortOption,
 }) {
     const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
@@ -82,6 +86,43 @@ export default function Sidebar({
         }));
     }
 
+    const clearAllFilters = () => {
+        // Reset checkbox filters
+        setCheckboxFilters((prev) => {
+            const newFilters = { ...prev };
+            Object.keys(newFilters).forEach((sectionId) => {
+                Object.keys(newFilters[sectionId].options).forEach((option) => {
+                    newFilters[sectionId].options[option] = false;
+                });
+            });
+            return newFilters;
+        });
+
+        // Reset number filters
+        setNumberFilters((prev) => {
+            const newFilters = { ...prev };
+            Object.keys(newFilters).forEach((sectionId) => {
+                newFilters[sectionId].startVal = "";
+                newFilters[sectionId].endVal = "";
+            });
+            return newFilters;
+        });
+    };
+
+    const hasActiveFilters = () => {
+        // Check if any checkbox filters are active
+        const hasCheckboxFilters = Object.values(checkboxFilters).some(
+            (section) => Object.values(section.options).some(Boolean)
+        );
+
+        // Check if any number filters are active
+        const hasNumberFilters = Object.values(numberFilters).some(
+            (section) => section.startVal !== "" || section.endVal !== ""
+        );
+
+        return hasCheckboxFilters || hasNumberFilters;
+    };
+
     return (
         <div className="bg-white">
             <div>
@@ -102,13 +143,13 @@ export default function Sidebar({
                             className="relative ml-auto flex size-full max-w-xs transform flex-col overflow-y-auto bg-white pt-4 pb-6 transition duration-300 ease-in-out data-closed:translate-x-full"
                         >
                             <div className="flex items-center justify-between px-4">
-                                <h2 className="text-lg font-medium text-gray-900">
+                                <h2 className="text-lg font-medium text-stone-800">
                                     Filters
                                 </h2>
                                 <button
                                     type="button"
                                     onClick={() => setMobileFiltersOpen(false)}
-                                    className="relative -mr-2 flex size-10 items-center justify-center rounded-md bg-white p-2 text-gray-400 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:outline-hidden"
+                                    className="relative -mr-2 flex size-10 items-center justify-center rounded-md bg-white p-2 text-stone-400 hover:bg-stone-50 focus:ring-2 focus:ring-red-500 focus:outline-hidden"
                                 >
                                     <span className="absolute -inset-0.5" />
                                     <span className="sr-only">Close menu</span>
@@ -119,8 +160,21 @@ export default function Sidebar({
                                 </button>
                             </div>
 
+                            {/* Clear Filters Button */}
+                            {hasActiveFilters() && (
+                                <div className="px-4 py-2">
+                                    <button
+                                        onClick={clearAllFilters}
+                                        className="flex items-center gap-2 w-full justify-center px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 hover:border-red-300 transition-colors"
+                                    >
+                                        <RotateCcw className="w-4 h-4" />
+                                        Clear All Filters
+                                    </button>
+                                </div>
+                            )}
+
                             {/* Filters */}
-                            <form className="mt-4 border-t border-gray-200">
+                            <form className="mt-4 border-t border-stone-200">
                                 <h3 className="sr-only">Categories</h3>
 
                                 {/* Checkbox Filters */}
@@ -129,11 +183,11 @@ export default function Sidebar({
                                         <Disclosure
                                             key={sectionId}
                                             as="div"
-                                            className="border-t border-gray-200 px-4 py-6"
+                                            className="border-t border-stone-200 px-4 py-6"
                                         >
                                             <h3 className="-mx-2 -my-3 flow-root">
-                                                <DisclosureButton className="group flex w-full items-center justify-between bg-white px-2 py-3 text-gray-400 hover:text-gray-500">
-                                                    <span className="font-medium text-gray-900">
+                                                <DisclosureButton className="group flex w-full items-center justify-between bg-white px-2 py-3 text-stone-400 hover:text-stone-500">
+                                                    <span className="font-medium text-stone-800">
                                                         {
                                                             checkboxFilters[
                                                                 sectionId
@@ -198,7 +252,7 @@ export default function Sidebar({
                                                                                     })
                                                                                 );
                                                                             }}
-                                                                            className="col-start-1 row-start-1 appearance-none rounded-sm border border-gray-400 bg-white checked:border-red-500 checked:bg-red-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
+                                                                            className="col-start-1 row-start-1 appearance-none rounded-sm border border-stone-400 bg-white checked:border-red-500 checked:bg-red-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
                                                                         />
                                                                         <svg
                                                                             fill="none"
@@ -223,7 +277,7 @@ export default function Sidebar({
                                                                 </div>
                                                                 <label
                                                                     htmlFor={`filter-mobile-${sectionId}-${idx}`}
-                                                                    className="min-w-0 flex-1 text-gray-500"
+                                                                    className="min-w-0 flex-1 text-stone-500"
                                                                 >
                                                                     {optionValue
                                                                         .charAt(
@@ -249,11 +303,11 @@ export default function Sidebar({
                                         <Disclosure
                                             key={sectionId}
                                             as="div"
-                                            className="border-t border-gray-200 px-4 py-6"
+                                            className="border-t border-stone-200 px-4 py-6"
                                         >
                                             <h3 className="-mx-2 -my-3 flow-root">
-                                                <DisclosureButton className="group flex w-full items-center justify-between bg-white px-2 py-3 text-gray-400 hover:text-gray-500">
-                                                    <span className="font-medium text-gray-900">
+                                                <DisclosureButton className="group flex w-full items-center justify-between bg-white px-2 py-3 text-stone-400 hover:text-stone-500">
+                                                    <span className="font-medium text-stone-800">
                                                         {
                                                             numberFilters[
                                                                 sectionId
@@ -289,9 +343,11 @@ export default function Sidebar({
                                                                 e.target.value
                                                             )
                                                         }
-                                                        className="w-full h-full border border-gray-500 placeholder:text-gray-500 rounded-md p-2"
+                                                        className="w-full h-full border border-stone-300 placeholder:text-stone-500 rounded-md p-2 focus:ring-2 focus:ring-red-500 focus:border-red-500 focus:outline-none"
                                                     />
-                                                    <p>to</p>
+                                                    <p className="text-stone-500">
+                                                        to
+                                                    </p>
                                                     <input
                                                         type="number"
                                                         value={
@@ -313,7 +369,7 @@ export default function Sidebar({
                                                                 e.target.value
                                                             )
                                                         }
-                                                        className="w-full h-full border border-gray-500 placeholder:text-gray-500 rounded-md p-2"
+                                                        className="w-full h-full border border-stone-300 placeholder:text-stone-500 rounded-md p-2 focus:ring-2 focus:ring-red-500 focus:border-red-500 focus:outline-none"
                                                     />
                                                 </div>
                                             </DisclosurePanel>
@@ -327,12 +383,12 @@ export default function Sidebar({
 
                 <main className="mx-auto max-w-7xl">
                     <div className="flex items-baseline justify-between">
-                        <div className="flex items-center">
+                        <div className="flex items-center gap-2">
                             <Menu
                                 as="div"
                                 className="relative inline-block text-left"
                             >
-                                <MenuButton className="group inline-flex justify-center text-sm border border-gray-200 px-2 py-1 rounded-md font-medium text-gray-700 hover:text-gray-900 cursor-pointer">
+                                <MenuButton className="group inline-flex justify-center text-sm border border-stone-200 px-2 py-1 rounded-md font-medium text-stone-700 hover:text-stone-900 hover:border-red-500 cursor-pointer transition-colors">
                                     Sort
                                     <ChevronDown
                                         aria-hidden="true"
@@ -347,17 +403,22 @@ export default function Sidebar({
                                     <div className="py-1">
                                         {sortOptions.map((option) => (
                                             <MenuItem key={option.name}>
-                                                <a
-                                                    href={option.href}
+                                                <button
+                                                    onClick={() =>
+                                                        setSortOption(
+                                                            option.value
+                                                        )
+                                                    }
                                                     className={classNames(
-                                                        option.current
-                                                            ? "font-medium text-gray-900"
-                                                            : "text-gray-500",
-                                                        "block px-4 py-2 text-sm data-focus:bg-gray-100 data-focus:outline-hidden"
+                                                        sortOption ===
+                                                            option.value
+                                                            ? "font-medium text-stone-900"
+                                                            : "text-stone-500",
+                                                        "block w-full text-left px-4 py-2 text-sm data-focus:bg-stone-100 data-focus:outline-hidden"
                                                     )}
                                                 >
                                                     {option.name}
-                                                </a>
+                                                </button>
                                             </MenuItem>
                                         ))}
                                     </div>
@@ -367,11 +428,22 @@ export default function Sidebar({
                             <button
                                 type="button"
                                 onClick={() => setMobileFiltersOpen(true)}
-                                className=" ml-2 p-2 border border-gray-200 px-2 py-1 rounded-md text-gray-700 hover:text-gray-900 cursor-pointer"
+                                className="p-2 border border-stone-200 px-2 py-1 rounded-md text-stone-700 hover:text-stone-900 hover:border-red-500 cursor-pointer transition-colors"
                             >
                                 <span className="sr-only">Filters</span>
                                 <Funnel aria-hidden="true" className="size-5" />
                             </button>
+
+                            {/* Clear Filters Button - Desktop */}
+                            {hasActiveFilters() && (
+                                <button
+                                    onClick={clearAllFilters}
+                                    className="flex items-center gap-2 px-3 py-1 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 hover:border-red-300 transition-colors"
+                                >
+                                    <RotateCcw className="w-4 h-4" />
+                                    Clear
+                                </button>
+                            )}
                         </div>
                     </div>
                 </main>
