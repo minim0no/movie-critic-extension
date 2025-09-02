@@ -234,13 +234,15 @@ function cleanData(data) {
     data.Runtime = data.Runtime || "N/A";
     data.totalSeasons = data.totalSeasons || null;
     data.Year = data.Year || "N/A";
-    data.Genre = data.Genre.split(", ") || [];
-    data.Actors = data.Actors.split(", ") || [];
-    data.Awards = data.Awards.split(". ") || [];
+    data.Genre = data.Genre ? data.Genre.split(", ") : [];
+    data.Actors = data.Actors ? data.Actors.split(", ") : [];
+    data.Awards = data.Awards ? data.Awards.split(". ") : [];
     data.Poster = data.Poster || "https://placehold.co/200x200.png?text=?";
     data.imdbRating = data.imdbRating || "N/A";
     data.rottenTomatoesScore =
-        data.Ratings.find((r) => r.Source === "Rotten Tomatoes")?.Value || "";
+        (data.Ratings &&
+            data.Ratings.find((r) => r.Source === "Rotten Tomatoes")?.Value) ||
+        "";
     data.imdbVotes = data.imdbVotes || "N/A";
     data.aiCritique = data.aiCritique || "No critique available.";
     return data;
@@ -270,30 +272,109 @@ function detectHover() {
 
                 hoverTimer = setTimeout(() => {
                     let movieTitle = movieIMG.nextElementSibling?.innerText;
-                    if (!movieTitle) return;
-                    movieTitle = movieTitle.trim().toLowerCase();
+
+                    // Debug the HTML structure
+                    console.log("Movie image element:", movieIMG);
+                    console.log(
+                        "Next sibling element:",
+                        movieIMG.nextElementSibling
+                    );
+                    console.log(
+                        "Next sibling innerText:",
+                        movieIMG.nextElementSibling?.innerText
+                    );
+                    console.log(
+                        "Next sibling outerHTML:",
+                        movieIMG.nextElementSibling?.outerHTML
+                    );
+
+                    if (!movieTitle) {
+                        console.log("No movie title found, returning");
+                        return;
+                    }
+
+                    // Clean and normalize the movie title
+                    movieTitle = movieTitle.trim();
+                    const originalTitle = movieTitle; // Keep original for debugging
+                    const searchTitle = movieTitle.toLowerCase(); // For cache keys and logging
+
+                    // Debug logging for movie title
+                    console.log("Original movie title:", originalTitle);
+                    console.log("Search title (lowercase):", searchTitle);
+                    console.log(
+                        "URI encoded title:",
+                        encodeURIComponent(originalTitle)
+                    );
+                    console.log("Sending to background script:", {
+                        movieName: originalTitle, // Send original case to API
+                        type: "MovieQuery",
+                    });
+
                     (async () => {
                         const response = await chrome.runtime.sendMessage({
-                            movieName: movieTitle,
+                            movieName: originalTitle, // Send original case to API
                             type: "MovieQuery",
                         });
 
+                        // Debug logging
+                        console.log(
+                            "Response from background script:",
+                            response
+                        );
+
                         if (previewModal != null) {
                             try {
-                                if (response.movieData.Response === "True") {
-                                    const cleanedData = cleanData(
-                                        response.movieData
+                                // Check if we have valid response data
+                                if (
+                                    response &&
+                                    response.movieData &&
+                                    response.movieData.Response === "True" &&
+                                    response.movieData.Title
+                                ) {
+                                    try {
+                                        const cleanedData = cleanData(
+                                            response.movieData
+                                        );
+                                        populatePopup(cleanedData);
+                                        positionPopup(previewModal);
+                                        popup.style.display = "block";
+                                        setTimeout(() => {
+                                            popup.style.opacity = "1";
+                                            popup.style.transform = "scale(1)";
+                                        }, 100);
+                                    } catch (error) {
+                                        console.error(
+                                            "Error processing movie data:",
+                                            error
+                                        );
+                                        console.error(
+                                            "Raw movie data:",
+                                            response.movieData
+                                        );
+                                    }
+                                } else {
+                                    // Log what we actually received for debugging
+                                    console.warn(
+                                        "Invalid or missing movie data:",
+                                        {
+                                            hasResponse: !!response,
+                                            hasMovieData: !!(
+                                                response && response.movieData
+                                            ),
+                                            responseType:
+                                                response?.movieData?.Response,
+                                            hasTitle:
+                                                !!response?.movieData?.Title,
+                                            fullResponse: response,
+                                        }
                                     );
-                                    populatePopup(cleanedData);
-                                    positionPopup(previewModal);
-                                    popup.style.display = "block";
-                                    setTimeout(() => {
-                                        popup.style.opacity = "1";
-                                        popup.style.transform = "scale(1)";
-                                    }, 100);
                                 }
                             } catch (e) {
                                 console.error("Error populating popup:", e);
+                                console.error(
+                                    "Response that caused error:",
+                                    response
+                                );
                             }
                         }
                     })();
@@ -311,6 +392,9 @@ function detectHover() {
         console.log(error);
     }
 }
+
+// These functions will be moved to the React app
+// The popup script only handles Netflix hover detection
 
 window.addEventListener("load", () => {
     const observer = new MutationObserver((mutations) => {

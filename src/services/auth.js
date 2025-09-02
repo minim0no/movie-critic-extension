@@ -154,17 +154,6 @@ class AuthService {
 
     // Sign out user
     async signOut() {
-        try {
-            if (this.token) {
-                // Revoke the token
-                await fetch(
-                    `https://accounts.google.com/o/oauth2/revoke?token=${this.token}`
-                );
-            }
-        } catch (error) {
-            console.error("Error revoking token:", error);
-        }
-
         // Clear local state
         this.token = null;
         this.isAuthenticated = false;

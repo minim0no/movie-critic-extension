@@ -17,28 +17,6 @@ function MovieDetail({
     onRemoveFromWatchlist,
     isInWatchlist,
 }) {
-    // Mock additional data for demonstration
-    const movieData = {
-        ...movie,
-        runtime: "2h 32m",
-        director: "Christopher Nolan",
-        actors: [
-            "Cillian Murphy",
-            "Emily Blunt",
-            "Matt Damon",
-            "Robert Downey Jr.",
-        ],
-        awards: [
-            "Best Picture - Academy Awards",
-            "Best Director - Golden Globes",
-        ],
-        aiCritique:
-            "A masterful exploration of scientific discovery and moral responsibility. Nolan's direction creates an intense, thought-provoking experience that balances historical accuracy with compelling storytelling. The film's visual effects and sound design are groundbreaking, making it a cinematic achievement that will be studied for years to come.",
-        imdbVotes: "789,432",
-        rottenTomatoesScore: "93%",
-        plot: "The story of American scientist J. Robert Oppenheimer and his role in the development of the atomic bomb.",
-    };
-
     return (
         <div className="h-full overflow-y-auto bg-white">
             {/* Header with Back Button */}
@@ -70,11 +48,13 @@ function MovieDetail({
                             <Calendar className="w-4 h-4" />
                             <span>{movie.year}</span>
                             <span>•</span>
-                            <Clock className="w-4 h-4" />
-                            <span>{movieData.runtime}</span>
-                            <span>•</span>
                             <Film className="w-4 h-4" />
-                            <span>{movie.genre}</span>
+                            <span>
+                                {Array.isArray(movie.genre) &&
+                                movie.genre.length > 0
+                                    ? movie.genre.join(", ")
+                                    : "Unknown"}
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -92,16 +72,9 @@ function MovieDetail({
                     <div className="flex items-center gap-2">
                         <Users className="w-4 h-4 text-gray-500" />
                         <span className="text-gray-600 text-sm">
-                            {movieData.imdbVotes} votes
-                        </span>
-                    </div>
-                    <div className="flex items-center gap-2 mb-4">
-                        <span className="text-2xl">🍅</span>
-                        <span className="font-semibold">
-                            {movieData.rottenTomatoesScore}
-                        </span>
-                        <span className="text-gray-500 text-sm">
-                            Rotten Tomatoes
+                            {movie.imdbVotes && movie.imdbVotes !== "N/A"
+                                ? `${movie.imdbVotes} votes`
+                                : "No vote count available"}
                         </span>
                     </div>
 
@@ -128,7 +101,7 @@ function MovieDetail({
                 <div>
                     <h3 className="font-semibold text-stone-800 mb-2">Plot</h3>
                     <p className="text-gray-600 text-sm leading-relaxed">
-                        {movieData.plot}
+                        {movie.plot}
                     </p>
                 </div>
 
@@ -160,19 +133,25 @@ function MovieDetail({
                         Cast
                     </h3>
                     <div className="flex flex-wrap gap-2">
-                        {movieData.actors.map((actor, index) => (
-                            <span
-                                key={index}
-                                className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm"
-                            >
-                                {actor}
+                        {movie.actors && typeof movie.actors === "string" ? (
+                            movie.actors.split(", ").map((actor, index) => (
+                                <span
+                                    key={index}
+                                    className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm"
+                                >
+                                    {actor.trim()}
+                                </span>
+                            ))
+                        ) : (
+                            <span className="text-gray-500 text-sm">
+                                Cast information not available
                             </span>
-                        ))}
+                        )}
                     </div>
                 </div>
 
                 {/* Awards */}
-                {movieData.awards.length > 0 && (
+                {movie.awards && movie.awards !== "N/A" && (
                     <div>
                         <div className="flex items-center gap-2 mb-2">
                             <Trophy className="w-5 h-5 text-yellow-500" />
@@ -180,15 +159,8 @@ function MovieDetail({
                                 Awards
                             </h3>
                         </div>
-                        <div className="space-y-1">
-                            {movieData.awards.map((award, index) => (
-                                <div
-                                    key={index}
-                                    className="text-gray-600 text-sm"
-                                >
-                                    {award}
-                                </div>
-                            ))}
+                        <div className="text-gray-600 text-sm">
+                            {movie.awards}
                         </div>
                     </div>
                 )}
@@ -202,7 +174,9 @@ function MovieDetail({
                         </h3>
                     </div>
                     <p className="text-gray-600 text-sm leading-relaxed">
-                        {movieData.aiCritique}
+                        AI-powered movie analysis coming soon! This feature will
+                        provide intelligent insights and recommendations based
+                        on your preferences.
                     </p>
                 </div>
 
@@ -214,9 +188,7 @@ function MovieDetail({
                     <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                             <span className="text-gray-500">Director</span>
-                            <div className="font-medium">
-                                {movieData.director}
-                            </div>
+                            <div className="font-medium">{movie.director}</div>
                         </div>
                         <div>
                             <span className="text-gray-500">Box Office</span>
@@ -228,7 +200,19 @@ function MovieDetail({
                         </div>
                         <div>
                             <span className="text-gray-500">Rated</span>
-                            <div className="font-medium">{movieData.rated}</div>
+                            <div className="font-medium">
+                                {movie.rated || "N/A"}
+                            </div>
+                        </div>
+                        <div>
+                            <span className="text-gray-500">Runtime</span>
+                            <div className="font-medium">
+                                {movie.runtime || "N/A"}
+                            </div>
+                        </div>
+                        <div>
+                            <span className="text-gray-500">Source</span>
+                            <div className="font-medium">{movie.source}</div>
                         </div>
                     </div>
                 </div>

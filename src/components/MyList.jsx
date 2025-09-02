@@ -87,13 +87,24 @@ function MyList({ watchlist = [], onRemoveFromWatchlist, onViewMovieDetails }) {
 
             if (activeFilters.length > 0) {
                 if (sectionId === "genre") {
-                    filtered = filtered.filter((movie) =>
-                        activeFilters.some((genre) =>
-                            movie.genre
-                                ?.toLowerCase()
-                                .includes(genre.toLowerCase())
-                        )
-                    );
+                    filtered = filtered.filter((movie) => {
+                        if (!movie.genre) return false;
+
+                        let movieGenres = [];
+                        if (Array.isArray(movie.genre)) {
+                            movieGenres = movie.genre.map((g) =>
+                                g.toLowerCase()
+                            );
+                        } else if (typeof movie.genre === "string") {
+                            movieGenres = [movie.genre.toLowerCase()];
+                        }
+
+                        return activeFilters.some((genre) =>
+                            movieGenres.some((movieGenre) =>
+                                movieGenre.includes(genre.toLowerCase())
+                            )
+                        );
+                    });
                 } else if (sectionId === "language") {
                     filtered = filtered.filter((movie) =>
                         activeFilters.some((language) =>
@@ -110,20 +121,22 @@ function MyList({ watchlist = [], onRemoveFromWatchlist, onViewMovieDetails }) {
         Object.entries(numberFilters).forEach(([sectionId, section]) => {
             if (section.startVal !== "" || section.endVal !== "") {
                 if (sectionId === "imdb") {
-                    const minRating = section.startVal || section.min;
-                    const maxRating = section.endVal || section.max;
-                    filtered = filtered.filter(
-                        (movie) =>
-                            movie.rating >= minRating &&
-                            movie.rating <= maxRating
-                    );
+                    const minRating =
+                        parseFloat(section.startVal) || section.min;
+                    const maxRating = parseFloat(section.endVal) || section.max;
+                    filtered = filtered.filter((movie) => {
+                        const movieRating = parseFloat(movie.ratingValue) || 0;
+                        return (
+                            movieRating >= minRating && movieRating <= maxRating
+                        );
+                    });
                 } else if (sectionId === "date") {
-                    const minYear = section.startVal || section.min;
-                    const maxYear = section.endVal || section.max;
-                    filtered = filtered.filter(
-                        (movie) =>
-                            movie.year >= minYear && movie.year <= maxYear
-                    );
+                    const minYear = parseInt(section.startVal) || section.min;
+                    const maxYear = parseInt(section.endVal) || section.max;
+                    filtered = filtered.filter((movie) => {
+                        const movieYear = parseInt(movie.year) || 0;
+                        return movieYear >= minYear && movieYear <= maxYear;
+                    });
                 }
             }
         });
@@ -140,7 +153,9 @@ function MyList({ watchlist = [], onRemoveFromWatchlist, onViewMovieDetails }) {
                 return filtered.sort((a, b) => b.title.localeCompare(a.title));
             case "rating":
             default:
-                return filtered.sort((a, b) => b.rating - a.rating);
+                return filtered.sort(
+                    (a, b) => (b.ratingValue || 0) - (a.ratingValue || 0)
+                );
         }
     }, [watchlist, checkboxFilters, numberFilters, sortOption]);
 
@@ -149,11 +164,28 @@ function MyList({ watchlist = [], onRemoveFromWatchlist, onViewMovieDetails }) {
         setFilteredWatchlist(filteredAndSortedWatchlist);
     }, [filteredAndSortedWatchlist]);
 
+    // Debug logging
+    useEffect(() => {
+        console.log("MyList - Filters changed:", {
+            checkboxFilters,
+            numberFilters,
+        });
+        console.log("MyList - Watchlist length:", watchlist.length);
+        console.log("MyList - Filtered length:", filteredWatchlist.length);
+        console.log("MyList - Sort option:", sortOption);
+    }, [
+        checkboxFilters,
+        numberFilters,
+        watchlist.length,
+        filteredWatchlist.length,
+        sortOption,
+    ]);
+
     const totalRuntime = filteredWatchlist.length * 120; // Assuming 120 min average
     const averageRating =
         filteredWatchlist.length > 0
             ? filteredWatchlist.reduce(
-                  (sum, movie) => sum + (movie.rating || 0),
+                  (sum, movie) => sum + (movie.ratingValue || 0),
                   0
               ) / filteredWatchlist.length
             : 0;

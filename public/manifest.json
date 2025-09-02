@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "CineMate: Movie Statistics on Netflix",
-    "description": "View IMDb and Rotten Tomatoes ratings and critiques on Netflix or through the extension search bar!",
+    "description": "Your Personal Movie Companion: Discover, Track, and Curate Your Favorites!",
     "version": "2.0",
     "action": {
         "default_popup": "index.html"

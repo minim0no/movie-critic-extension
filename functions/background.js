@@ -31,10 +31,9 @@ function getGenreName(genreId) {
 async function handleMovieDataRequestPromise(movieName, movieYear) {
     // First, check cache before making any API calls
     // Create a more robust cache key that preserves important characters
-    const cacheKey = `movie-${movieName
-        .toLowerCase()
-        .replace(/[^a-z0-9\s.-]/g, "")
-        .replace(/\s+/g, "-")}_${movieYear?.substring(0, 4) || "any"}`;
+    const cacheKey = `movie-${movieName.toLowerCase().replace(/[^a-z0-9\s.-]/g, "").replace(/\s+/g, "-")}_${
+        movieYear?.substring(0, 4) || "any"
+    }`;
 
     // Check cache first
     return new Promise((resolve, reject) => {

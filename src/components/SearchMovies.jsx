@@ -1,10 +1,9 @@
 import { useEffect, useState, useMemo } from "react";
 import React from "react";
 import Input from "./Input";
-import { Search } from "lucide-react";
+import { Search, Loader2 } from "lucide-react";
 import Sidebar from "./Sidebar";
 import { MovieCard } from "./MovieCard";
-import { getMoviesByCategory } from "../data/movies";
 
 function SearchMovies({
     onAddToWatchlist,
@@ -83,14 +82,90 @@ function SearchMovies({
         },
     });
 
-    // Get movies from centralized data
-    const searchMovies = getMoviesByCategory("search");
+    const [searchResults, setSearchResults] = useState([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [searchError, setSearchError] = useState(null);
+    const [trendingMovies, setTrendingMovies] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    // Map movies with watchlist status
-    const moviesWithWatchlistStatus = searchMovies.map((movie) => ({
+    // Map movies with watchlist status - include both search results and trending movies
+    const allMovies = searchQuery ? searchResults : trendingMovies;
+    const moviesWithWatchlistStatus = allMovies.map((movie) => ({
         ...movie,
-        isInWatchlist: watchlist.some((w) => w.id === movie.id),
+        isInWatchlist: watchlist.some(
+            (w) =>
+                w.title === movie.title ||
+                w.id === movie.id ||
+                (w.imdbID && movie.imdbID && w.imdbID === movie.imdbID)
+        ),
     }));
+
+    // Search movies using the new API
+    const performSearch = async (query) => {
+        if (!query.trim()) {
+            setSearchResults([]);
+            return;
+        }
+
+        try {
+            setIsSearching(true);
+            setSearchError(null);
+
+            const response = await chrome.runtime.sendMessage({
+                type: "SearchMovies",
+                query: query,
+            });
+
+            if (response.success && response.movies) {
+                setSearchResults(response.movies);
+            } else {
+                setSearchResults([]);
+                setSearchError("No movies found");
+            }
+        } catch (error) {
+            console.error("Search error:", error);
+            setSearchError("Search failed. Please try again.");
+            setSearchResults([]);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    useEffect(() => {
+        const fetchTrendingMovies = async () => {
+            try {
+                setLoading(true);
+                const response = await chrome.runtime.sendMessage({
+                    type: "GetTrendingMovies",
+                });
+
+                if (response.success && response.movies) {
+                    console.log("Received trending movies:", response.movies);
+                    setTrendingMovies(response.movies);
+                } else {
+                    console.error("Failed to load trending movies:", response);
+                    setError("Failed to load trending movies");
+                }
+            } catch (error) {
+                console.error("Error fetching trending movies:", error);
+                setError("Error loading trending movies");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchTrendingMovies();
+    }, []);
+
+    // Perform search when query changes
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            performSearch(searchQuery);
+        }, 500); // Debounce search
+
+        return () => clearTimeout(timeoutId);
+    }, [searchQuery]);
 
     // Filter movies based on search query and filters
     const filteredMovies = useMemo(() => {
@@ -99,10 +174,16 @@ function SearchMovies({
             const matchesSearch =
                 !searchQuery ||
                 movie.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                movie.genre.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                movie.language
-                    .toLowerCase()
-                    .includes(searchQuery.toLowerCase());
+                (movie.genre &&
+                    Array.isArray(movie.genre) &&
+                    movie.genre.some((genre) =>
+                        genre.toLowerCase().includes(searchQuery.toLowerCase())
+                    )) ||
+                (movie.genre &&
+                    typeof movie.genre === "string" &&
+                    movie.genre
+                        .toLowerCase()
+                        .includes(searchQuery.toLowerCase()));
 
             if (!matchesSearch) return false;
 
@@ -114,10 +195,19 @@ function SearchMovies({
             const hasActiveGenreFilters =
                 Object.values(genreFilters).some(Boolean);
             if (hasActiveGenreFilters) {
-                const movieGenre = movie.genre.toLowerCase();
+                let movieGenres = [];
+                if (Array.isArray(movie.genre)) {
+                    movieGenres = movie.genre.map((g) => g.toLowerCase());
+                } else if (typeof movie.genre === "string") {
+                    movieGenres = [movie.genre.toLowerCase()];
+                }
+
                 const matchesGenre = Object.entries(genreFilters).some(
                     ([genre, isChecked]) =>
-                        isChecked && movieGenre.includes(genre.toLowerCase())
+                        isChecked &&
+                        movieGenres.some((movieGenre) =>
+                            movieGenre.includes(genre.toLowerCase())
+                        )
                 );
                 if (!matchesGenre) return false;
             }
@@ -126,7 +216,7 @@ function SearchMovies({
             const hasActiveLanguageFilters =
                 Object.values(languageFilters).some(Boolean);
             if (hasActiveLanguageFilters) {
-                const movieLanguage = movie.language.toLowerCase();
+                const movieLanguage = movie.language?.toLowerCase() || "";
                 const matchesLanguage = Object.entries(languageFilters).some(
                     ([language, isChecked]) =>
                         isChecked &&
@@ -142,10 +232,14 @@ function SearchMovies({
                 numberFilters.imdb.endVal !== ""
             ) {
                 const minRating =
-                    numberFilters.imdb.startVal || numberFilters.imdb.min;
+                    parseFloat(numberFilters.imdb.startVal) ||
+                    numberFilters.imdb.min;
                 const maxRating =
-                    numberFilters.imdb.endVal || numberFilters.imdb.max;
-                if (movie.rating < minRating || movie.rating > maxRating)
+                    parseFloat(numberFilters.imdb.endVal) ||
+                    numberFilters.imdb.max;
+                const movieRating = parseFloat(movie.ratingValue) || 0;
+
+                if (movieRating < minRating || movieRating > maxRating)
                     return false;
             }
 
@@ -155,10 +249,14 @@ function SearchMovies({
                 numberFilters.date.endVal !== ""
             ) {
                 const minYear =
-                    numberFilters.date.startVal || numberFilters.date.min;
+                    parseInt(numberFilters.date.startVal) ||
+                    numberFilters.date.min;
                 const maxYear =
-                    numberFilters.date.endVal || numberFilters.date.max;
-                if (movie.year < minYear || movie.year > maxYear) return false;
+                    parseInt(numberFilters.date.endVal) ||
+                    numberFilters.date.max;
+                const movieYear = parseInt(movie.year) || 0;
+
+                if (movieYear < minYear || movieYear > maxYear) return false;
             }
 
             return true;
@@ -186,13 +284,37 @@ function SearchMovies({
             case "rating":
             default:
                 // For "popular", we'll sort by rating as a proxy for popularity
-                return sorted.sort((a, b) => b.rating - a.rating);
+                return sorted.sort(
+                    (a, b) => (b.ratingValue || 0) - (a.ratingValue || 0)
+                );
         }
     }, [filteredMovies, sortOption]);
 
     useEffect(() => {
-        console.log(checkboxFilters, numberFilters);
-    }, [checkboxFilters, numberFilters]);
+        console.log("SearchMovies - Filters changed:", {
+            checkboxFilters,
+            numberFilters,
+        });
+        console.log("SearchMovies - Search query:", searchQuery);
+        console.log(
+            "SearchMovies - Movies with watchlist status:",
+            moviesWithWatchlistStatus.length
+        );
+        console.log("SearchMovies - Filtered movies:", filteredMovies.length);
+        console.log(
+            "SearchMovies - Sorted movies:",
+            sortedAndFilteredMovies.length
+        );
+        console.log("SearchMovies - Sort option:", sortOption);
+    }, [
+        checkboxFilters,
+        numberFilters,
+        searchQuery,
+        moviesWithWatchlistStatus,
+        filteredMovies,
+        sortedAndFilteredMovies,
+        sortOption,
+    ]);
 
     return (
         <div className="space-y-6 p-6 rounded-lg h-full overflow-y-auto">
@@ -216,25 +338,106 @@ function SearchMovies({
             />
 
             <div className="flex items-center justify-between mb-3">
-                <span className=" text-base font-medium">
-                    {searchQuery ? "Search Results" : "Trending"}
+                <span className="text-base font-medium">
+                    {searchQuery ? "Search Results" : "Trending Movies"}
                 </span>
                 <span className="text-sm text-stone-500">
-                    {sortedAndFilteredMovies.length} movies found
+                    {searchQuery
+                        ? `${sortedAndFilteredMovies.length} ${
+                              sortedAndFilteredMovies.length === 1
+                                  ? "item"
+                                  : "items"
+                          } found`
+                        : `${trendingMovies.length} ${
+                              trendingMovies.length === 1 ? "item" : "items"
+                          } available`}
                 </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 pb-6">
-                {sortedAndFilteredMovies.map((movie) => (
-                    <MovieCard
-                        key={movie.id}
-                        movie={movie}
-                        onAddToWatchlist={onAddToWatchlist}
-                        onRemoveFromWatchlist={onRemoveFromWatchlist}
-                        onViewDetails={onViewMovieDetails}
-                    />
-                ))}
-            </div>
+            {/* Loading State */}
+            {isSearching && (
+                <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-blue-500 mr-3" />
+                    <span className="text-stone-600">Searching movies...</span>
+                </div>
+            )}
+
+            {/* Error State */}
+            {searchError && !isSearching && (
+                <div className="text-center py-12 text-red-500">
+                    <p>{searchError}</p>
+                </div>
+            )}
+
+            {/* No Results */}
+            {!isSearching &&
+                !searchError &&
+                sortedAndFilteredMovies.length === 0 &&
+                searchQuery && (
+                    <div className="text-center py-12 text-stone-500">
+                        <p>No movies found for "{searchQuery}"</p>
+                        <p className="text-sm mt-2">
+                            Try searching for a different movie or check the
+                            spelling
+                        </p>
+                    </div>
+                )}
+
+            {/* Loading State for Trending Movies */}
+            {!searchQuery && loading && (
+                <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-blue-500 mr-3" />
+                    <span className="text-stone-600">
+                        Loading trending movies...
+                    </span>
+                </div>
+            )}
+
+            {/* Error State for Trending Movies */}
+            {!searchQuery && error && (
+                <div className="text-center py-12 text-red-500">
+                    <p>{error}</p>
+                </div>
+            )}
+
+            {/* No Results */}
+            {!isSearching &&
+                !searchError &&
+                sortedAndFilteredMovies.length === 0 &&
+                searchQuery && (
+                    <div className="text-center py-12 text-stone-500">
+                        <p>No movies found for "{searchQuery}"</p>
+                        <p className="text-sm mt-2">
+                            Try searching for a different movie or check the
+                            spelling
+                        </p>
+                    </div>
+                )}
+
+            {/* No Movies Available */}
+            {!searchQuery &&
+                !loading &&
+                !error &&
+                sortedAndFilteredMovies.length === 0 && (
+                    <div className="text-center py-12 text-stone-500">
+                        <p>No trending movies available</p>
+                    </div>
+                )}
+
+            {/* Movie Grid */}
+            {sortedAndFilteredMovies.length > 0 && (
+                <div className="grid grid-cols-2 gap-3 pb-6">
+                    {sortedAndFilteredMovies.map((movie) => (
+                        <MovieCard
+                            key={movie.title}
+                            movie={movie}
+                            onAddToWatchlist={onAddToWatchlist}
+                            onRemoveFromWatchlist={onRemoveFromWatchlist}
+                            onViewDetails={onViewMovieDetails}
+                        />
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

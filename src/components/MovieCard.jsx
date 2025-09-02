@@ -34,9 +34,7 @@ export function MovieCard({
                 <div className="absolute top-2 right-2 bg-black/90 px-2 py-1 rounded-md shadow-lg text-xs">
                     <Badge className="inline-flex items-center ">
                         <Star className="w-3 h-3 mr-1 fill-yellow-400 text-yellow-400" />
-                        <span className="text-white">
-                            {movie.rating.toFixed(1)}
-                        </span>
+                        <span className="text-white">{movie.rating}</span>
                     </Badge>
                 </div>
             </div>
@@ -47,8 +45,10 @@ export function MovieCard({
                 </h3>
                 <div className="flex items-center justify-between text-sm text-gray-500 mb-3">
                     <span>{movie.year}</span>
-                    <span className="text-xs px-2 py-0.5 bg-gray-200 rounded-md">
-                        {movie.genre}
+                    <span className="text-xs px-2 py-0.5 bg-gray-200 rounded-md whitespace-nowrap overflow-hidden text-ellipsis">
+                        {Array.isArray(movie.genre) && movie.genre.length > 0
+                            ? movie.genre[0]
+                            : movie.genre || "Unknown"}
                     </span>
                 </div>
 
