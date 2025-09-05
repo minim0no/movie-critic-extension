@@ -15,6 +15,37 @@ function AppContent() {
     const [previousView, setPreviousView] = useState("search");
     const { isAuthenticated, user, loading } = useAuth();
 
+    // Load user watchlist when authenticated
+    useEffect(() => {
+        const loadWatchlist = async () => {
+            if (isAuthenticated && user?.email) {
+                try {
+                    const response = await chrome.runtime.sendMessage({
+                        type: "GET_USER_WATCHLIST",
+                        data: { userEmail: user.email },
+                    });
+
+                    if (response.success) {
+                        // Ensure all watchlist movies have isInWatchlist: true
+                        const watchlistWithStatus = response.watchlist.map(
+                            (movie) => ({
+                                ...movie,
+                                isInWatchlist: true,
+                            })
+                        );
+                        setWatchlist(watchlistWithStatus);
+                    }
+                } catch (error) {
+                    console.error("Error loading watchlist:", error);
+                }
+            } else {
+                setWatchlist([]); // Clear watchlist when not authenticated
+            }
+        };
+
+        loadWatchlist();
+    }, [isAuthenticated, user]);
+
     // Check for requested view from background script
     useEffect(() => {
         chrome.storage.local.get(["requestedView"], (result) => {
@@ -26,22 +57,151 @@ function AppContent() {
         });
     }, []);
 
-    const handleAddToWatchlist = (movie) => {
+    const handleAddToWatchlist = async (movie) => {
         if (!isAuthenticated) {
             setView("myList"); // Redirect to MyList to show login
             return;
         }
 
-        if (!watchlist.some((w) => w.id === movie.id)) {
-            setWatchlist((prev) => [
-                ...prev,
-                { ...movie, isInWatchlist: true },
-            ]);
+        // Optimistic update - immediately add to UI
+        const movieData = {
+            title: movie.title || movie.Title,
+            year: movie.year || movie.Year,
+            imdbId: movie.imdbId || movie.imdbID || movie.id,
+            plot: movie.plot || movie.Plot || movie.overview,
+            genre: movie.genre || movie.Genre,
+            poster: movie.poster || movie.Poster,
+            director: movie.director || movie.Director,
+            actors: movie.actors || movie.Actors,
+            // Keep both rating formats for compatibility (OMDB uses imdbRating)
+            rating: movie.rating || movie.imdbRating,
+            imdbRating: movie.imdbRating || movie.rating,
+            ratingValue: movie.ratingValue || movie.imdbRating || movie.rating,
+            imdbVotes: movie.imdbVotes || movie.votes,
+            language: movie.language || movie.Language,
+            // Additional OMDB fields (with correct capitalization)
+            runtime: movie.runtime || movie.Runtime,
+            boxOffice: movie.boxOffice || movie.BoxOffice,
+            rated: movie.rated || movie.Rated,
+            writer: movie.writer || movie.Writer,
+            awards: movie.awards || movie.Awards,
+            metascore: movie.metascore || movie.Metascore,
+            type: movie.type || movie.Type,
+            dvd: movie.dvd || movie.DVD,
+            production: movie.production || movie.Production,
+            website: movie.website || movie.Website,
+            // Additional useful fields
+            country: movie.country || movie.Country,
+            released: movie.released || movie.Released,
+            isInWatchlist: true,
+        };
+
+        // Check if already exists before doing anything
+        const isAlreadyInWatchlist = watchlist.some(
+            (w) =>
+                w.id === movie.id ||
+                w.imdbId === movie.imdbId ||
+                w.imdbId === movieData.imdbId
+        );
+
+        if (isAlreadyInWatchlist) {
+            console.log("Movie already in watchlist, skipping");
+            return;
+        }
+
+        // Immediately update UI
+        console.log("Optimistically adding movie to watchlist:", movieData);
+        setWatchlist((prev) => [...prev, movieData]);
+
+        // Save to database
+        try {
+            const response = await chrome.runtime.sendMessage({
+                type: "ADD_MOVIE_TO_LIST",
+                data: {
+                    userEmail: user.email,
+                    listId: "watchlist",
+                    movieData: movieData,
+                },
+            });
+
+            if (response.success) {
+                console.log("Successfully saved movie to database");
+            } else {
+                // Revert optimistic update if database save failed
+                console.log(
+                    "Database save failed, reverting optimistic update"
+                );
+                setWatchlist((prev) =>
+                    prev.filter((w) => w.imdbId !== movieData.imdbId)
+                );
+            }
+        } catch (error) {
+            console.error("Error adding to watchlist:", error);
+            // Revert optimistic update on error
+            setWatchlist((prev) =>
+                prev.filter((w) => w.imdbId !== movieData.imdbId)
+            );
         }
     };
 
-    const handleRemoveFromWatchlist = (movie) => {
-        setWatchlist((prev) => prev.filter((w) => w.id !== movie.id));
+    const handleRemoveFromWatchlist = async (movie) => {
+        // Optimistic update - immediately remove from UI
+        console.log(
+            `Optimistically removing movie "${movie.title}" from watchlist`
+        );
+        const originalWatchlist = [...watchlist];
+
+        setWatchlist((prev) =>
+            prev.filter((w) => {
+                // Try multiple ID matching strategies
+                const movieIds = [movie.id, movie.imdbId, movie.imdbID].filter(
+                    Boolean
+                );
+                const watchlistIds = [w.id, w.imdbId, w.imdbID].filter(Boolean);
+
+                // Check if any IDs match
+                const hasIdMatch = movieIds.some((mId) =>
+                    watchlistIds.some((wId) => String(mId) === String(wId))
+                );
+
+                // Fallback to title matching (case insensitive)
+                const hasTitleMatch =
+                    movie.title &&
+                    w.title &&
+                    movie.title.toLowerCase().trim() ===
+                        w.title.toLowerCase().trim();
+
+                // Keep movies that DON'T match (inverse of the matching logic)
+                return !(hasIdMatch || hasTitleMatch);
+            })
+        );
+
+        // Then save to database
+        try {
+            const response = await chrome.runtime.sendMessage({
+                type: "REMOVE_FROM_WATCHLIST",
+                data: {
+                    userEmail: user.email,
+                    movieId: movie.imdbId || movie.id,
+                },
+            });
+
+            if (response.success) {
+                console.log(
+                    `Successfully removed movie "${movie.title}" from database`
+                );
+            } else {
+                // Revert optimistic update if database removal failed
+                console.log(
+                    "Database removal failed, reverting optimistic update"
+                );
+                setWatchlist(originalWatchlist);
+            }
+        } catch (error) {
+            console.error("Error removing from watchlist:", error);
+            // Revert optimistic update on error
+            setWatchlist(originalWatchlist);
+        }
     };
 
     const handleViewMovieDetails = (movie) => {
@@ -56,7 +216,27 @@ function AppContent() {
     };
 
     const isMovieInWatchlist = (movie) => {
-        return watchlist.some((w) => w.id === movie.id);
+        return watchlist.some((w) => {
+            // Try multiple ID matching strategies
+            const movieIds = [movie.id, movie.imdbId, movie.imdbID].filter(
+                Boolean
+            );
+            const watchlistIds = [w.id, w.imdbId, w.imdbID].filter(Boolean);
+
+            // Check if any IDs match
+            const hasIdMatch = movieIds.some((mId) =>
+                watchlistIds.some((wId) => String(mId) === String(wId))
+            );
+
+            // Fallback to title matching (case insensitive)
+            const hasTitleMatch =
+                movie.title &&
+                w.title &&
+                movie.title.toLowerCase().trim() ===
+                    w.title.toLowerCase().trim();
+
+            return hasIdMatch || hasTitleMatch;
+        });
     };
 
     // Show loading state
@@ -166,6 +346,7 @@ function AppContent() {
                     ))}
                 {view === "movieDetail" && selectedMovie && (
                     <MovieDetail
+                        key={selectedMovie.imdbId || selectedMovie.id}
                         movie={selectedMovie}
                         onBack={handleBackFromMovieDetail}
                         onAddToWatchlist={handleAddToWatchlist}

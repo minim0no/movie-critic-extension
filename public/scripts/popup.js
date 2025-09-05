@@ -1,3 +1,5 @@
+/* global chrome */
+
 const popup = document.createElement("div");
 popup.style.position = "fixed";
 popup.style.background = "rgba(0,0,0,0.95)";
@@ -71,6 +73,55 @@ const sparklesSVG = `
     <circle cx="4" cy="20" r="2" fill="#a855f7"/>
     </svg>
 </div>`;
+
+// Load AI critique asynchronously
+async function loadAICritiqueAsync(movieTitle, movieData, previewModal) {
+    try {
+        console.log("Loading AI critique for:", movieTitle);
+        const aiCritiqueResponse = await chrome.runtime.sendMessage({
+            movieName: movieTitle,
+            type: "GetAICritique",
+        });
+
+        console.log("AI Critique response:", aiCritiqueResponse);
+
+        // Update the popup with the AI critique if still visible
+        if (
+            previewModal &&
+            document.body.contains(previewModal) &&
+            popup.style.display === "block"
+        ) {
+            if (
+                aiCritiqueResponse &&
+                aiCritiqueResponse.success &&
+                aiCritiqueResponse.critique
+            ) {
+                movieData.aiCritique = aiCritiqueResponse.critique;
+            } else {
+                movieData.aiCritique =
+                    "Unable to generate AI critique at this time.";
+            }
+
+            // Re-populate the popup with the updated data
+            populatePopup(movieData);
+            positionPopup(previewModal);
+        }
+    } catch (error) {
+        console.warn("Failed to load AI critique:", error);
+
+        // Update with error message if popup is still visible
+        if (
+            previewModal &&
+            document.body.contains(previewModal) &&
+            popup.style.display === "block"
+        ) {
+            movieData.aiCritique =
+                "Unable to generate AI critique at this time.";
+            populatePopup(movieData);
+            positionPopup(previewModal);
+        }
+    }
+}
 
 // helper to populate popup
 function populatePopup(movie) {
@@ -193,7 +244,22 @@ function populatePopup(movie) {
             ${sparklesSVG}
             <h4 style="font-size:1.3rem; font-weight:600; margin: 0;">AI Critique</h4>
         </div>
-          <p style="color:#9ca3af; font-size:1.1rem; line-height:1.5; margin-top: 0;">${movie.aiCritique}</p>
+          ${
+              movie.aiCritique === "loading"
+                  ? `
+          <div style="display:flex; align-items:center; gap:0.5rem; color:#9ca3af; font-size:1.1rem; line-height:1.5; margin-top: 0;">
+            <div style="width:16px; height:16px; border:2px solid #9ca3af; border-top:2px solid transparent; border-radius:50%; animation: spin 1s linear infinite;"></div>
+            <span>Generating AI critique...</span>
+          </div>
+          <style>
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          </style>
+          `
+                  : `<p style="color:#9ca3af; font-size:1.1rem; line-height:1.5; margin-top: 0;">${movie.aiCritique}</p>`
+          }
           `
                 : ""
         }
@@ -244,7 +310,7 @@ function cleanData(data) {
             data.Ratings.find((r) => r.Source === "Rotten Tomatoes")?.Value) ||
         "";
     data.imdbVotes = data.imdbVotes || "N/A";
-    data.aiCritique = data.aiCritique || "No critique available.";
+    data.aiCritique = data.aiCritique || null;
     return data;
 }
 
@@ -335,6 +401,9 @@ function detectHover() {
                                         const cleanedData = cleanData(
                                             response.movieData
                                         );
+
+                                        // Show initial popup with loading state for AI critique
+                                        cleanedData.aiCritique = "loading";
                                         populatePopup(cleanedData);
                                         positionPopup(previewModal);
                                         popup.style.display = "block";
@@ -342,6 +411,13 @@ function detectHover() {
                                             popup.style.opacity = "1";
                                             popup.style.transform = "scale(1)";
                                         }, 100);
+
+                                        // Load AI critique asynchronously
+                                        loadAICritiqueAsync(
+                                            originalTitle,
+                                            cleanedData,
+                                            previewModal
+                                        );
                                     } catch (error) {
                                         console.error(
                                             "Error processing movie data:",

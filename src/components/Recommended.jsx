@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Sparkles, TrendingUp, Award, Clock, Loader2 } from "lucide-react";
 import { MovieCard } from "./MovieCard";
+
+/* global chrome */
 
 function RecommendedComponent({
     onAddToWatchlist,
@@ -10,25 +12,75 @@ function RecommendedComponent({
 }) {
     const [trendingMovies, setTrendingMovies] = useState([]);
     const [topRatedMovies, setTopRatedMovies] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const [tasteBasedMovies] = useState([]); // For future use
 
-    const mapMoviesWithWatchlistStatus = (movies) =>
-        movies.map((movie) => ({
-            ...movie,
-            isInWatchlist: watchlist.some(
-                (w) =>
-                    w.title === movie.title ||
-                    w.id === movie.id ||
-                    (w.imdbID && movie.imdbID && w.imdbID === movie.imdbID)
-            ),
-        }));
+    // Separate loading states for each section
+    const [trendingLoading, setTrendingLoading] = useState(true);
+    const [topRatedLoading, setTopRatedLoading] = useState(true);
+    const [tasteBasedLoading] = useState(false); // For future use
 
-    // Fetch trending movies from TMDb
+    const [trendingError, setTrendingError] = useState(null);
+    const [topRatedError, setTopRatedError] = useState(null);
+    const [tasteBasedError] = useState(null); // For future use
+
+    const mapMoviesWithWatchlistStatus = useCallback(
+        (movies) => {
+            console.log(
+                "Recommended: Mapping movies with watchlist status. Watchlist has",
+                watchlist.length,
+                "movies"
+            );
+            return movies.map((movie) => {
+                const isInWatchlist = watchlist.some((w) => {
+                    // Try multiple ID matching strategies
+                    const movieIds = [
+                        movie.id,
+                        movie.imdbId,
+                        movie.imdbID,
+                    ].filter(Boolean);
+                    const watchlistIds = [w.id, w.imdbId, w.imdbID].filter(
+                        Boolean
+                    );
+
+                    // Check if any IDs match
+                    const hasIdMatch = movieIds.some((mId) =>
+                        watchlistIds.some((wId) => String(mId) === String(wId))
+                    );
+
+                    // Fallback to title matching (case insensitive)
+                    const hasTitleMatch =
+                        movie.title &&
+                        w.title &&
+                        movie.title.toLowerCase().trim() ===
+                            w.title.toLowerCase().trim();
+
+                    return hasIdMatch || hasTitleMatch;
+                });
+
+                if (movie.title) {
+                    console.log(
+                        `Recommended - Movie "${movie.title}" isInWatchlist:`,
+                        isInWatchlist,
+                        "movieIds:",
+                        [movie.id, movie.imdbId, movie.imdbID].filter(Boolean)
+                    );
+                }
+
+                return {
+                    ...movie,
+                    isInWatchlist,
+                };
+            });
+        },
+        [watchlist]
+    );
+
+    // Fetch movies from TMDb
     useEffect(() => {
         const fetchTrendingMovies = async () => {
             try {
-                setLoading(true);
+                setTrendingLoading(true);
+                setTrendingError(null);
                 const response = await chrome.runtime.sendMessage({
                     type: "GetTrendingMovies",
                 });
@@ -38,18 +90,20 @@ function RecommendedComponent({
                     setTrendingMovies(response.movies);
                 } else {
                     console.error("Failed to load trending movies:", response);
-                    setError("Failed to load trending movies");
+                    setTrendingError("Failed to load trending movies");
                 }
             } catch (error) {
                 console.error("Error fetching trending movies:", error);
-                setError("Error loading trending movies");
+                setTrendingError("Error loading trending movies");
             } finally {
-                setLoading(false);
+                setTrendingLoading(false);
             }
         };
 
         const fetchTopRatedMovies = async () => {
             try {
+                setTopRatedLoading(true);
+                setTopRatedError(null);
                 const response = await chrome.runtime.sendMessage({
                     type: "GetTopRatedMovies",
                 });
@@ -59,14 +113,25 @@ function RecommendedComponent({
                     setTopRatedMovies(response.movies);
                 } else {
                     console.error("Failed to load top-rated movies:", response);
+                    setTopRatedError("Failed to load top-rated movies");
                 }
             } catch (error) {
                 console.error("Error fetching top-rated movies:", error);
+                setTopRatedError("Error loading top-rated movies");
+            } finally {
+                setTopRatedLoading(false);
             }
+        };
+
+        // For future taste-based recommendations
+        const fetchTasteBasedMovies = async () => {
+            // This will be implemented when the AI recommendation feature is ready
+            // For now, we'll keep it as "Coming Soon"
         };
 
         fetchTrendingMovies();
         fetchTopRatedMovies();
+        fetchTasteBasedMovies();
     }, []);
 
     return (
@@ -101,15 +166,17 @@ function RecommendedComponent({
                     </span>
                 </div>
 
-                {loading ? (
+                {trendingLoading ? (
                     <div className="flex items-center justify-center py-8">
                         <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
                         <span className="ml-2 text-stone-600">
                             Loading trending movies...
                         </span>
                     </div>
-                ) : error ? (
-                    <div className="text-center py-8 text-red-500">{error}</div>
+                ) : trendingError ? (
+                    <div className="text-center py-8 text-red-500">
+                        {trendingError}
+                    </div>
                 ) : (
                     <div className="overflow-x-auto">
                         <div
@@ -150,33 +217,46 @@ function RecommendedComponent({
                     </span>
                 </div>
 
-                <div className="overflow-x-auto">
-                    <div
-                        className="flex gap-3 pb-4"
-                        style={{ minWidth: "max-content" }}
-                    >
-                        {mapMoviesWithWatchlistStatus(topRatedMovies).map(
-                            (movie) => (
-                                <div
-                                    key={movie.title}
-                                    className="w-40 flex-shrink-0"
-                                >
-                                    <MovieCard
-                                        movie={movie}
-                                        onAddToWatchlist={onAddToWatchlist}
-                                        onRemoveFromWatchlist={
-                                            onRemoveFromWatchlist
-                                        }
-                                        onViewDetails={onViewMovieDetails}
-                                    />
-                                </div>
-                            )
-                        )}
+                {topRatedLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin text-yellow-500" />
+                        <span className="ml-2 text-stone-600">
+                            Loading top-rated movies...
+                        </span>
                     </div>
-                </div>
+                ) : topRatedError ? (
+                    <div className="text-center py-8 text-red-500">
+                        {topRatedError}
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <div
+                            className="flex gap-3 pb-4"
+                            style={{ minWidth: "max-content" }}
+                        >
+                            {mapMoviesWithWatchlistStatus(topRatedMovies).map(
+                                (movie) => (
+                                    <div
+                                        key={movie.title}
+                                        className="w-40 flex-shrink-0"
+                                    >
+                                        <MovieCard
+                                            movie={movie}
+                                            onAddToWatchlist={onAddToWatchlist}
+                                            onRemoveFromWatchlist={
+                                                onRemoveFromWatchlist
+                                            }
+                                            onViewDetails={onViewMovieDetails}
+                                        />
+                                    </div>
+                                )
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
 
-            {/* Coming Soon */}
+            {/* Based on Your Taste */}
             <div className="space-y-4">
                 <div className="flex items-center gap-3">
                     <div className="p-1.5 bg-red-100 rounded-lg">
@@ -190,13 +270,51 @@ function RecommendedComponent({
                     </span>
                 </div>
 
-                <div className="text-center py-8 text-stone-500">
-                    <Sparkles className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p>
-                        AI-powered recommendations based on your watchlist and
-                        preferences
-                    </p>
-                </div>
+                {tasteBasedLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin text-red-500" />
+                        <span className="ml-2 text-stone-600">
+                            Analyzing your preferences...
+                        </span>
+                    </div>
+                ) : tasteBasedError ? (
+                    <div className="text-center py-8 text-red-500">
+                        {tasteBasedError}
+                    </div>
+                ) : tasteBasedMovies.length > 0 ? (
+                    <div className="overflow-x-auto">
+                        <div
+                            className="flex gap-3 pb-4"
+                            style={{ minWidth: "max-content" }}
+                        >
+                            {mapMoviesWithWatchlistStatus(tasteBasedMovies).map(
+                                (movie) => (
+                                    <div
+                                        key={movie.title}
+                                        className="w-40 flex-shrink-0"
+                                    >
+                                        <MovieCard
+                                            movie={movie}
+                                            onAddToWatchlist={onAddToWatchlist}
+                                            onRemoveFromWatchlist={
+                                                onRemoveFromWatchlist
+                                            }
+                                            onViewDetails={onViewMovieDetails}
+                                        />
+                                    </div>
+                                )
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="text-center py-8 text-stone-500">
+                        <Sparkles className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                        <p>
+                            AI-powered recommendations based on your watchlist
+                            and preferences
+                        </p>
+                    </div>
+                )}
             </div>
 
             {/* Refresh Recommendations */}
@@ -204,6 +322,12 @@ function RecommendedComponent({
                 <button
                     onClick={async () => {
                         try {
+                            // Reset all loading states
+                            setTrendingLoading(true);
+                            setTopRatedLoading(true);
+                            setTrendingError(null);
+                            setTopRatedError(null);
+
                             await chrome.runtime.sendMessage({
                                 type: "ClearCache",
                             });
@@ -221,6 +345,12 @@ function RecommendedComponent({
                 <button
                     onClick={async () => {
                         try {
+                            // Reset all loading states
+                            setTrendingLoading(true);
+                            setTopRatedLoading(true);
+                            setTrendingError(null);
+                            setTopRatedError(null);
+
                             await chrome.runtime.sendMessage({
                                 type: "ClearCache",
                             });

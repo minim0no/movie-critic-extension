@@ -1,3 +1,5 @@
+/* global chrome */
+
 // Background script for handling movie data requests
 
 // TMDb genre mapping
@@ -474,6 +476,139 @@ function clearExpiredCachedMovies() {
     });
 }
 
+// Get AI critique for a movie
+async function getAICritique(movieName) {
+    try {
+        // First get movie data to send comprehensive information to AI
+        const movieDataResult = await handleMovieDataRequestPromise(movieName);
+
+        if (
+            !movieDataResult.movieData ||
+            movieDataResult.movieData.Response !== "True"
+        ) {
+            throw new Error("Could not find movie data for AI critique");
+        }
+
+        const movieData = movieDataResult.movieData;
+
+        // Check cache first
+        const cacheKey = `ai-critique-${movieName
+            .toLowerCase()
+            .replace(/[^a-z0-9\s.-]/g, "")
+            .replace(/\s+/g, "-")}`;
+        const cached = await new Promise((resolve) => {
+            chrome.storage.local.get(cacheKey, (result) =>
+                resolve(result[cacheKey])
+            );
+        });
+
+        if (cached && cached.timestamp) {
+            const oneWeek = 7 * 24 * 60 * 60 * 1000; // Cache AI critiques for a week
+            if (Date.now() - cached.timestamp < oneWeek) {
+                console.log("Returning cached AI critique");
+                return cached.critique;
+            }
+        }
+
+        // Call Firebase function for AI critique
+        console.log("Fetching fresh AI critique from Firebase function");
+        const functionUrl =
+            "https://us-central1-movie-chrome-extension-a68f2.cloudfunctions.net/getAICritique";
+
+        const response = await fetch(functionUrl, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                movieData: movieData,
+            }),
+        });
+
+        const result = await response.json();
+        console.log("AI critique Firebase function response:", result);
+
+        if (result.success && result.critique) {
+            // Cache the AI critique
+            const cacheData = {
+                critique: result.critique,
+                timestamp: Date.now(),
+            };
+            await new Promise((resolve) => {
+                chrome.storage.local.set({ [cacheKey]: cacheData }, resolve);
+            });
+
+            return result.critique;
+        } else {
+            throw new Error(result.error || "Failed to get AI critique");
+        }
+    } catch (error) {
+        console.error("Error getting AI critique:", error);
+        throw error;
+    }
+}
+
+// Save user rating for a movie
+async function saveUserRating(movieTitle, rating) {
+    try {
+        const ratingKey = `user-rating-${movieTitle
+            .toLowerCase()
+            .replace(/[^a-z0-9\s.-]/g, "")
+            .replace(/\s+/g, "-")}`;
+        const ratingData = {
+            movieTitle: movieTitle,
+            rating: rating,
+            timestamp: Date.now(),
+        };
+
+        await new Promise((resolve) => {
+            chrome.storage.local.set({ [ratingKey]: ratingData }, resolve);
+        });
+
+        console.log(`Saved user rating for ${movieTitle}: ${rating}/5`);
+    } catch (error) {
+        console.error("Error saving user rating:", error);
+        throw error;
+    }
+}
+
+// Get user rating for a movie
+async function getUserRating(movieTitle) {
+    try {
+        const ratingKey = `user-rating-${movieTitle
+            .toLowerCase()
+            .replace(/[^a-z0-9\s.-]/g, "")
+            .replace(/\s+/g, "-")}`;
+        const result = await new Promise((resolve) => {
+            chrome.storage.local.get(ratingKey, (result) =>
+                resolve(result[ratingKey])
+            );
+        });
+
+        return result ? result.rating : 0; // Return 0 if no rating found
+    } catch (error) {
+        console.error("Error getting user rating:", error);
+        throw error;
+    }
+}
+
+// Get user ratings for multiple movies (bulk operation)
+async function getUserRatings(movieTitles) {
+    try {
+        const ratings = {};
+
+        for (const movieTitle of movieTitles) {
+            const rating = await getUserRating(movieTitle);
+            ratings[movieTitle] = rating;
+        }
+
+        return ratings;
+    } catch (error) {
+        console.error("Error getting user ratings:", error);
+        throw error;
+    }
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Handle popup opening requests
     if (message.action === "openPopup") {
@@ -567,5 +702,468 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
 
+    // Handle AI critique request
+    if (message.type === "GetAICritique") {
+        console.log("Received AI critique request for:", message.movieName);
+        getAICritique(message.movieName)
+            .then((critique) => {
+                console.log("Sending AI critique:", critique);
+                sendResponse({ success: true, critique });
+            })
+            .catch((error) => {
+                console.error("Error getting AI critique:", error);
+                sendResponse({ success: false, error: error.message });
+            });
+        return true;
+    }
+
+    // Handle user rating storage
+    if (message.type === "SaveUserRating") {
+        console.log("Received save user rating request:", message);
+        saveUserRating(message.movieTitle, message.rating)
+            .then(() => {
+                console.log("User rating saved successfully");
+                sendResponse({ success: true });
+            })
+            .catch((error) => {
+                console.error("Error saving user rating:", error);
+                sendResponse({ success: false, error: error.message });
+            });
+        return true;
+    }
+
+    // Handle user rating retrieval
+    if (message.type === "GetUserRating") {
+        console.log(
+            "Received get user rating request for:",
+            message.movieTitle
+        );
+        getUserRating(message.movieTitle)
+            .then((rating) => {
+                console.log("Sending user rating:", rating);
+                sendResponse({ success: true, rating });
+            })
+            .catch((error) => {
+                console.error("Error getting user rating:", error);
+                sendResponse({ success: false, error: error.message });
+            });
+        return true;
+    }
+
+    // Handle bulk user ratings retrieval
+    if (message.type === "GetUserRatings") {
+        console.log(
+            "Received get user ratings request for:",
+            message.movieTitles
+        );
+        getUserRatings(message.movieTitles)
+            .then((ratings) => {
+                console.log("Sending user ratings:", ratings);
+                sendResponse({ success: true, ratings });
+            })
+            .catch((error) => {
+                console.error("Error getting user ratings:", error);
+                sendResponse({ success: false, error: error.message });
+            });
+        return true;
+    }
+
+    // Firestore integration handlers
+    if (message.type === "GET_USER_LISTS") {
+        console.log(
+            "Received get user lists request for user:",
+            message.data.userEmail
+        );
+        getUserLists(message.data.userEmail)
+            .then((result) => {
+                sendResponse(result);
+            })
+            .catch((error) => {
+                console.error("Error getting user lists:", error);
+                sendResponse({ success: false, error: error.message });
+            });
+        return true;
+    }
+
+    if (message.type === "ADD_TO_WATCH_HISTORY") {
+        console.log(
+            "Received add to watch history request for user:",
+            message.data.userEmail
+        );
+        addToWatchHistory(message.data.userEmail, message.data.movieData)
+            .then((result) => {
+                sendResponse(result);
+            })
+            .catch((error) => {
+                console.error("Error adding to watch history:", error);
+                sendResponse({ success: false, error: error.message });
+            });
+        return true;
+    }
+
+    if (message.type === "ADD_MOVIE_TO_LIST") {
+        console.log("Received add movie to list request:", message.data);
+        addMovieToList(
+            message.data.userEmail,
+            message.data.listId,
+            message.data.movieData
+        )
+            .then((result) => {
+                sendResponse(result);
+            })
+            .catch((error) => {
+                console.error("Error adding movie to list:", error);
+                sendResponse({ success: false, error: error.message });
+            });
+        return true;
+    }
+
+    // RATE_MOVIE_IN_LIST is deprecated - use RATE_MOVIE only
+
+    // New dedicated rating system - rate any movie
+    if (message.type === "RATE_MOVIE") {
+        console.log("Received rate movie request:", message.data);
+        rateMovie(
+            message.data.userEmail,
+            message.data.movieId,
+            message.data.movieData,
+            message.data.rating
+        )
+            .then((result) => {
+                sendResponse(result);
+            })
+            .catch((error) => {
+                console.error("Error in rate movie:", error);
+                sendResponse({ success: false, error: error.message });
+            });
+        return true;
+    }
+
+    // New dedicated rating system - get rating for any movie
+    if (message.type === "GET_MOVIE_RATING") {
+        console.log("Received get movie rating request:", message.data);
+        getUserMovieRating(message.data.userEmail, message.data.movieId)
+            .then((result) => {
+                sendResponse(result);
+            })
+            .catch((error) => {
+                console.error("Error getting movie rating:", error);
+                sendResponse({ success: false, error: error.message });
+            });
+        return true;
+    }
+
+    // Get user watchlist from database
+    if (message.type === "GET_USER_WATCHLIST") {
+        console.log(
+            "Received get user watchlist request for:",
+            message.data.userEmail
+        );
+        getUserWatchlist(message.data.userEmail)
+            .then((result) => {
+                sendResponse(result);
+            })
+            .catch((error) => {
+                console.error("Error getting user watchlist:", error);
+                sendResponse({ success: false, error: error.message });
+            });
+        return true;
+    }
+
+    // Remove movie from watchlist
+    if (message.type === "REMOVE_FROM_WATCHLIST") {
+        console.log("Received remove from watchlist request:", message.data);
+        removeFromWatchlist(message.data.userEmail, message.data.movieId)
+            .then((result) => {
+                sendResponse(result);
+            })
+            .catch((error) => {
+                console.error("Error removing from watchlist:", error);
+                sendResponse({ success: false, error: error.message });
+            });
+        return true;
+    }
+
     return true;
 });
+
+// Firestore integration functions (using Firebase Functions)
+async function getUserLists(userEmail) {
+    try {
+        const response = await fetch(
+            "https://us-central1-movie-chrome-extension-a68f2.cloudfunctions.net/getUserLists",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ userEmail }),
+            }
+        );
+
+        const result = await response.json();
+        return result;
+    } catch (error) {
+        console.error("Error getting user lists:", error);
+        // Fallback to local storage
+        const mockLists = [
+            { id: "watchlist", name: "My Watchlist", movies: [] },
+            { id: "favorites", name: "Favorites", movies: [] },
+            { id: "to-watch", name: "To Watch Later", movies: [] },
+        ];
+        return { success: true, lists: mockLists };
+    }
+}
+
+async function addToWatchHistory(userEmail, movieData) {
+    try {
+        const response = await fetch(
+            "https://us-central1-movie-chrome-extension-a68f2.cloudfunctions.net/addToWatchHistory",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ userEmail, movieData }),
+            }
+        );
+
+        const result = await response.json();
+        return result;
+    } catch (error) {
+        console.error("Error adding to watch history:", error);
+        // Fallback to local storage
+        const historyKey = `watch-history-${userEmail}`;
+        const storageResult = await chrome.storage.local.get([historyKey]);
+        const history = storageResult[historyKey] || [];
+
+        const filteredHistory = history.filter(
+            (item) => item.imdbId !== movieData.imdbId
+        );
+        filteredHistory.unshift({
+            ...movieData,
+            watchedAt: new Date().toISOString(),
+        });
+
+        const updatedHistory = filteredHistory.slice(0, 100);
+        await chrome.storage.local.set({
+            [historyKey]: updatedHistory,
+        });
+
+        return { success: true };
+    }
+}
+
+async function addMovieToList(userEmail, listId, movieData) {
+    try {
+        const response = await fetch(
+            "https://us-central1-movie-chrome-extension-a68f2.cloudfunctions.net/addMovieToList",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ userEmail, listId, movieData }),
+            }
+        );
+
+        const result = await response.json();
+        return result;
+    } catch (error) {
+        console.error("Error adding movie to list:", error);
+        // Fallback to local storage
+        const listKey = `list-${userEmail}-${listId}`;
+        const storageResult = await chrome.storage.local.get([listKey]);
+        const movies = storageResult[listKey] || [];
+
+        const existingIndex = movies.findIndex(
+            (movie) =>
+                movie.imdbId === movieData.imdbId ||
+                movie.title.toLowerCase() === movieData.title.toLowerCase()
+        );
+
+        if (existingIndex === -1) {
+            movies.push({
+                ...movieData,
+                addedAt: new Date().toISOString(),
+                userRating: null,
+            });
+
+            await chrome.storage.local.set({
+                [listKey]: movies,
+            });
+        }
+
+        return { success: true };
+    }
+}
+
+async function rateMovieInList(userEmail, listId, movieId, rating) {
+    try {
+        const response = await fetch(
+            "https://us-central1-movie-chrome-extension-a68f2.cloudfunctions.net/rateMovieInList",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ userEmail, listId, movieId, rating }),
+            }
+        );
+
+        const result = await response.json();
+        return result;
+    } catch (error) {
+        console.error("Error rating movie in list:", error);
+        // Fallback to local storage
+        const listKey = `list-${userEmail}-${listId}`;
+        const storageResult = await chrome.storage.local.get([listKey]);
+        const movies = storageResult[listKey] || [];
+
+        const movieIndex = movies.findIndex(
+            (movie) => movie.imdbId === movieId || movie.id === movieId
+        );
+
+        if (movieIndex !== -1) {
+            movies[movieIndex].userRating = rating;
+            movies[movieIndex].ratedAt = new Date().toISOString();
+
+            await chrome.storage.local.set({
+                [listKey]: movies,
+            });
+        }
+
+        return { success: true };
+    }
+}
+
+async function getUserWatchlist(userEmail) {
+    try {
+        const response = await fetch(
+            "https://us-central1-movie-chrome-extension-a68f2.cloudfunctions.net/getUserWatchlist",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ userEmail }),
+            }
+        );
+
+        const result = await response.json();
+        return result;
+    } catch (error) {
+        console.error("Error getting user watchlist:", error);
+        // Fallback to local storage
+        const listKey = `list-${userEmail}-watchlist`;
+        const storageResult = await chrome.storage.local.get([listKey]);
+        const movies = storageResult[listKey] || [];
+
+        return { success: true, watchlist: movies };
+    }
+}
+
+async function removeFromWatchlist(userEmail, movieId) {
+    try {
+        const response = await fetch(
+            "https://us-central1-movie-chrome-extension-a68f2.cloudfunctions.net/removeFromWatchlist",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ userEmail, movieId }),
+            }
+        );
+
+        const result = await response.json();
+        return result;
+    } catch (error) {
+        console.error("Error removing from watchlist:", error);
+        // Fallback to local storage
+        const listKey = `list-${userEmail}-watchlist`;
+        const storageResult = await chrome.storage.local.get([listKey]);
+        const movies = storageResult[listKey] || [];
+
+        const filteredMovies = movies.filter(
+            (movie) => movie.imdbId !== movieId && movie.id !== movieId
+        );
+
+        await chrome.storage.local.set({
+            [listKey]: filteredMovies,
+        });
+
+        return { success: true };
+    }
+}
+
+// Rate any movie (dedicated rating system)
+async function rateMovie(userEmail, movieId, movieData, rating) {
+    try {
+        const payload = { userEmail, movieId, movieData, rating };
+        console.log("🔥 BACKGROUND - Sending to Firebase rateMovie:", {
+            userEmail,
+            movieId,
+            rating,
+            hasMovieData: !!movieData,
+            movieTitle: movieData?.title || movieData?.Title,
+        });
+
+        const response = await fetch(
+            "https://us-central1-movie-chrome-extension-a68f2.cloudfunctions.net/rateMovie",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(payload),
+            }
+        );
+
+        console.log(
+            "🔥 BACKGROUND - Firebase response status:",
+            response.status
+        );
+        const result = await response.json();
+        console.log("🔥 BACKGROUND - Firebase response data:", result);
+        return result;
+    } catch (error) {
+        console.error("Error rating movie:", error);
+        // Fallback to local storage
+        const ratingKey = `rating-cache-${movieId}`;
+        await chrome.storage.local.set({
+            [ratingKey]: { rating, timestamp: Date.now() },
+        });
+        return { success: true };
+    }
+}
+
+// Get user rating for any movie (dedicated rating system)
+async function getUserMovieRating(userEmail, movieId) {
+    try {
+        const response = await fetch(
+            "https://us-central1-movie-chrome-extension-a68f2.cloudfunctions.net/getUserRating",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ userEmail, movieId }),
+            }
+        );
+
+        const result = await response.json();
+        return result;
+    } catch (error) {
+        console.error("Error getting user rating:", error);
+        // Fallback to local storage
+        const ratingKey = `rating-cache-${movieId}`;
+        const storageResult = await chrome.storage.local.get([ratingKey]);
+        const ratingData = storageResult[ratingKey];
+
+        return {
+            success: true,
+            rating: ratingData ? ratingData.rating : 0,
+        };
+    }
+}

@@ -261,7 +261,7 @@ function MyList({ watchlist = [], onRemoveFromWatchlist, onViewMovieDetails }) {
                         {filteredWatchlist.map((movie) => (
                             <MovieCard
                                 key={movie.id}
-                                movie={movie}
+                                movie={{ ...movie, isInWatchlist: true }}
                                 onRemoveFromWatchlist={onRemoveFromWatchlist}
                                 showActions={true}
                                 onViewDetails={onViewMovieDetails}

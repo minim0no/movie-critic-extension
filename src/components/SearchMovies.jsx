@@ -91,15 +91,49 @@ function SearchMovies({
 
     // Map movies with watchlist status - include both search results and trending movies
     const allMovies = searchQuery ? searchResults : trendingMovies;
-    const moviesWithWatchlistStatus = allMovies.map((movie) => ({
-        ...movie,
-        isInWatchlist: watchlist.some(
-            (w) =>
-                w.title === movie.title ||
-                w.id === movie.id ||
-                (w.imdbID && movie.imdbID && w.imdbID === movie.imdbID)
-        ),
-    }));
+    const moviesWithWatchlistStatus = useMemo(() => {
+        console.log(
+            "SearchMovies: Recalculating movie statuses. Watchlist has",
+            watchlist.length,
+            "movies"
+        );
+        return allMovies.map((movie) => {
+            const isInWatchlist = watchlist.some((w) => {
+                // Try multiple ID matching strategies
+                const movieIds = [movie.id, movie.imdbId, movie.imdbID].filter(
+                    Boolean
+                );
+                const watchlistIds = [w.id, w.imdbId, w.imdbID].filter(Boolean);
+
+                // Check if any IDs match
+                const hasIdMatch = movieIds.some((mId) =>
+                    watchlistIds.some((wId) => String(mId) === String(wId))
+                );
+
+                // Fallback to title matching (case insensitive)
+                const hasTitleMatch =
+                    movie.title &&
+                    w.title &&
+                    movie.title.toLowerCase().trim() ===
+                        w.title.toLowerCase().trim();
+
+                return hasIdMatch || hasTitleMatch;
+            });
+
+            if (movie.title) {
+                console.log(
+                    `Movie "${movie.title}" isInWatchlist:`,
+                    isInWatchlist,
+                    "movieIds:",
+                    [movie.id, movie.imdbId, movie.imdbID].filter(Boolean)
+                );
+            }
+            return {
+                ...movie,
+                isInWatchlist,
+            };
+        });
+    }, [allMovies, watchlist]);
 
     // Search movies using the new API
     const performSearch = async (query) => {

@@ -34,7 +34,12 @@ export function MovieCard({
                 <div className="absolute top-2 right-2 bg-black/90 px-2 py-1 rounded-md shadow-lg text-xs">
                     <Badge className="inline-flex items-center ">
                         <Star className="w-3 h-3 mr-1 fill-yellow-400 text-yellow-400" />
-                        <span className="text-white">{movie.rating}</span>
+                        <span className="text-white">
+                            {movie.rating ||
+                                movie.imdbRating ||
+                                movie.ratingValue ||
+                                "N/A"}
+                        </span>
                     </Badge>
                 </div>
             </div>

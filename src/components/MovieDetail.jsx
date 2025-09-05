@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
     ArrowLeft,
     Star,
@@ -10,6 +10,8 @@ import {
     Film,
 } from "lucide-react";
 
+/* global chrome */
+
 function MovieDetail({
     movie,
     onBack,
@@ -17,6 +19,240 @@ function MovieDetail({
     onRemoveFromWatchlist,
     isInWatchlist,
 }) {
+    const [userRating, setUserRating] = useState(0);
+    const [hoverRating, setHoverRating] = useState(0);
+    const [aiCritique, setAiCritique] = useState(null);
+    const [aiCritiqueLoading, setAiCritiqueLoading] = useState(false);
+    const [aiCritiqueError, setAiCritiqueError] = useState(null);
+    const [ratingLoading, setRatingLoading] = useState(false);
+
+    // Load user rating for this movie - fast cached version
+    useEffect(() => {
+        const loadUserRating = async () => {
+            if (!movie.imdbId && !movie.id) return;
+
+            setRatingLoading(true);
+            const movieId = movie.imdbId || movie.id;
+
+            try {
+                // Try to get cached rating first
+                const cacheKey = `rating-cache-${movieId}`;
+                const cached = await chrome.storage.local.get([cacheKey]);
+
+                if (
+                    cached[cacheKey] &&
+                    Date.now() - cached[cacheKey].timestamp < 5 * 60 * 1000
+                ) {
+                    // 5 min cache
+                    setUserRating(cached[cacheKey].rating);
+                    setRatingLoading(false);
+                    return;
+                }
+
+                // Get current user info
+                const authResult = await chrome.storage.local.get([
+                    "authToken",
+                ]);
+                if (authResult.authToken) {
+                    const userResponse = await fetch(
+                        "https://www.googleapis.com/oauth2/v2/userinfo",
+                        {
+                            headers: {
+                                Authorization: `Bearer ${authResult.authToken}`,
+                            },
+                        }
+                    );
+
+                    if (userResponse.ok) {
+                        const userInfo = await userResponse.json();
+
+                        // Use new dedicated rating system
+                        const response = await chrome.runtime.sendMessage({
+                            type: "GET_MOVIE_RATING",
+                            data: {
+                                userEmail: userInfo.email,
+                                movieId: movieId,
+                            },
+                        });
+
+                        if (response.success) {
+                            const rating = response.rating || 0;
+                            setUserRating(rating);
+
+                            // Cache the result
+                            await chrome.storage.local.set({
+                                [cacheKey]: {
+                                    rating,
+                                    timestamp: Date.now(),
+                                },
+                            });
+                        }
+                    }
+                } else {
+                    // Fallback to old system if not authenticated
+                    const response = await chrome.runtime.sendMessage({
+                        type: "GetUserRating",
+                        movieTitle: movie.title,
+                    });
+                    if (response.success) {
+                        setUserRating(response.rating || 0);
+                    }
+                }
+            } catch (error) {
+                console.error("Error loading user rating:", error);
+                // Fallback to old system
+                try {
+                    const response = await chrome.runtime.sendMessage({
+                        type: "GetUserRating",
+                        movieTitle: movie.title,
+                    });
+                    if (response.success) {
+                        setUserRating(response.rating || 0);
+                    }
+                } catch (fallbackError) {
+                    console.error(
+                        "Fallback rating load failed:",
+                        fallbackError
+                    );
+                }
+            } finally {
+                setRatingLoading(false);
+            }
+        };
+
+        loadUserRating();
+    }, [movie.imdbId, movie.id, movie.title]);
+
+    // Load AI critique for this movie
+    useEffect(() => {
+        const loadAiCritique = async () => {
+            try {
+                setAiCritiqueLoading(true);
+                setAiCritiqueError(null);
+
+                const response = await chrome.runtime.sendMessage({
+                    movieName: movie.title,
+                    type: "GetAICritique",
+                });
+
+                if (response.success && response.critique) {
+                    setAiCritique(response.critique);
+                } else {
+                    setAiCritiqueError(
+                        "Unable to generate AI critique at this time."
+                    );
+                }
+            } catch (error) {
+                console.error("Error loading AI critique:", error);
+                setAiCritiqueError("Failed to load AI critique.");
+            } finally {
+                setAiCritiqueLoading(false);
+            }
+        };
+
+        if (movie.title) {
+            loadAiCritique();
+        }
+    }, [movie.title]);
+
+    // Handle star click to set rating - fast version
+    const handleStarClick = async (rating) => {
+        if (!movie.imdbId && !movie.id) return;
+
+        const movieId = movie.imdbId || movie.id;
+
+        // Optimistic update
+        setUserRating(rating);
+
+        try {
+            // Get current user info
+            const authResult = await chrome.storage.local.get(["authToken"]);
+            if (authResult.authToken) {
+                const userResponse = await fetch(
+                    "https://www.googleapis.com/oauth2/v2/userinfo",
+                    {
+                        headers: {
+                            Authorization: `Bearer ${authResult.authToken}`,
+                        },
+                    }
+                );
+
+                if (userResponse.ok) {
+                    const userInfo = await userResponse.json();
+
+                    // Use new dedicated rating system
+                    const response = await chrome.runtime.sendMessage({
+                        type: "RATE_MOVIE",
+                        data: {
+                            userEmail: userInfo.email,
+                            movieId: movieId,
+                            movieData: {
+                                title: movie.title,
+                                year: movie.year,
+                                poster: movie.poster,
+                            },
+                            rating: rating,
+                        },
+                    });
+
+                    if (response.success) {
+                        // Update cache immediately
+                        const cacheKey = `rating-cache-${movieId}`;
+                        await chrome.storage.local.set({
+                            [cacheKey]: {
+                                rating,
+                                timestamp: Date.now(),
+                            },
+                        });
+                        console.log(`Rated ${movie.title}: ${rating}/5`);
+                    } else {
+                        // Revert optimistic update and try fallback
+                        const fallbackResponse =
+                            await chrome.runtime.sendMessage({
+                                type: "SaveUserRating",
+                                movieTitle: movie.title,
+                                rating: rating,
+                            });
+                        if (!fallbackResponse.success) {
+                            setUserRating(0); // Revert if both fail
+                        }
+                    }
+                }
+            } else {
+                // Fallback to old system
+                const response = await chrome.runtime.sendMessage({
+                    type: "SaveUserRating",
+                    movieTitle: movie.title,
+                    rating: rating,
+                });
+
+                if (!response.success) {
+                    setUserRating(0); // Revert optimistic update
+                }
+            }
+        } catch (error) {
+            console.error("Error saving rating:", error);
+            // Try fallback before reverting
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    type: "SaveUserRating",
+                    movieTitle: movie.title,
+                    rating: rating,
+                });
+                if (!response.success) {
+                    setUserRating(0);
+                }
+            } catch (fallbackError) {
+                console.error("Fallback rating save failed:", fallbackError);
+                setUserRating(0); // Revert optimistic update
+            }
+        }
+    };
+
+    // Handle clear rating
+    const handleClearRating = async () => {
+        await handleStarClick(0);
+    };
     return (
         <div className="h-full overflow-y-auto bg-white">
             {/* Header with Back Button */}
@@ -64,18 +300,86 @@ function MovieDetail({
             <div className="p-4 space-y-6">
                 {/* Basic Info and Add/Remove Button */}
                 <div className="space-y-4">
+                    {/* IMDb Rating */}
                     <div className="flex items-center gap-2">
                         <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                        <span className="font-semibold">{movie.rating}</span>
+                        <span className="font-semibold">
+                            {movie.rating ||
+                                movie.imdbRating ||
+                                movie.ratingValue ||
+                                "N/A"}
+                        </span>
                         <span className="text-gray-500 text-sm">IMDb</span>
                     </div>
+
                     <div className="flex items-center gap-2">
                         <Users className="w-4 h-4 text-gray-500" />
                         <span className="text-gray-600 text-sm">
                             {movie.imdbVotes && movie.imdbVotes !== "N/A"
                                 ? `${movie.imdbVotes} votes`
+                                : movie.votes && movie.votes !== "N/A"
+                                ? `${movie.votes} votes`
                                 : "No vote count available"}
                         </span>
+                    </div>
+
+                    {/* User Rating - Inline with other ratings */}
+                    <div className="border-t border-gray-200 pt-3 mt-3">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-gray-700">
+                                Your Rating
+                            </span>
+                            {ratingLoading ? (
+                                <div className="w-4 h-4 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+                            ) : userRating > 0 ? (
+                                <span className="text-sm text-yellow-600 font-semibold">
+                                    {userRating}/5
+                                </span>
+                            ) : null}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <div className="flex gap-0.5">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                    <button
+                                        key={star}
+                                        onClick={() => handleStarClick(star)}
+                                        onMouseEnter={() =>
+                                            setHoverRating(star)
+                                        }
+                                        onMouseLeave={() => setHoverRating(0)}
+                                        className="p-0.5 hover:scale-105 transition-transform cursor-pointer"
+                                    >
+                                        <Star
+                                            className={`w-5 h-5 transition-colors ${
+                                                hoverRating > 0
+                                                    ? star <= hoverRating
+                                                        ? "fill-yellow-400 text-yellow-400"
+                                                        : "text-gray-300"
+                                                    : star <= userRating
+                                                    ? "fill-yellow-400 text-yellow-400"
+                                                    : "text-gray-300"
+                                            }`}
+                                        />
+                                    </button>
+                                ))}
+                            </div>
+
+                            {userRating > 0 && (
+                                <button
+                                    onClick={handleClearRating}
+                                    className="ml-2 text-xs text-gray-500 hover:text-red-500 underline cursor-pointer"
+                                >
+                                    Clear
+                                </button>
+                            )}
+                        </div>
+
+                        {userRating === 0 && (
+                            <p className="text-xs text-gray-500 mt-1">
+                                Rate this movie
+                            </p>
+                        )}
                     </div>
 
                     {/* Add/Remove Button */}
@@ -167,17 +471,37 @@ function MovieDetail({
 
                 {/* AI Critique */}
                 <div>
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-2 mb-3">
                         <Sparkles className="w-5 h-5 text-purple-500" />
                         <h3 className="font-semibold text-stone-800">
                             AI Critique
                         </h3>
                     </div>
-                    <p className="text-gray-600 text-sm leading-relaxed">
-                        AI-powered movie analysis coming soon! This feature will
-                        provide intelligent insights and recommendations based
-                        on your preferences.
-                    </p>
+
+                    {aiCritiqueLoading && (
+                        <div className="flex items-center gap-2 text-gray-500 text-sm">
+                            <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                            <span>Generating AI critique...</span>
+                        </div>
+                    )}
+
+                    {aiCritiqueError && (
+                        <p className="text-red-500 text-sm leading-relaxed">
+                            {aiCritiqueError}
+                        </p>
+                    )}
+
+                    {aiCritique && !aiCritiqueLoading && (
+                        <p className="text-gray-600 text-sm leading-relaxed">
+                            {aiCritique}
+                        </p>
+                    )}
+
+                    {!aiCritique && !aiCritiqueLoading && !aiCritiqueError && (
+                        <p className="text-gray-500 text-sm leading-relaxed italic">
+                            AI critique will appear here once generated...
+                        </p>
+                    )}
                 </div>
 
                 {/* Additional Stats */}
@@ -188,15 +512,21 @@ function MovieDetail({
                     <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                             <span className="text-gray-500">Director</span>
-                            <div className="font-medium">{movie.director}</div>
+                            <div className="font-medium">
+                                {movie.director || "N/A"}
+                            </div>
                         </div>
                         <div>
                             <span className="text-gray-500">Box Office</span>
-                            <div className="font-medium">{movie.boxOffice}</div>
+                            <div className="font-medium">
+                                {movie.boxOffice || "N/A"}
+                            </div>
                         </div>
                         <div>
                             <span className="text-gray-500">Language</span>
-                            <div className="font-medium">{movie.language}</div>
+                            <div className="font-medium">
+                                {movie.language || "N/A"}
+                            </div>
                         </div>
                         <div>
                             <span className="text-gray-500">Rated</span>
